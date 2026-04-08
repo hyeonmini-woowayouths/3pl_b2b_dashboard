@@ -92,7 +92,7 @@ CREATE TABLE IF NOT EXISTS partners (
   comment TEXT,
 
   -- 운영 정보
-  dp_code TEXT UNIQUE,
+  dp_code TEXT,
   biz_id TEXT,
   biz_member_name TEXT,
   sap_code TEXT,
