@@ -6,16 +6,18 @@ import { PIPELINE_STAGES } from '../../types/partner'
 import type { Partner, PipelineStage } from '../../types/partner'
 
 interface KanbanBoardProps {
-  partners: Partner[]
+  kanban: Record<string, { count: number; partners: Partner[] }>
   onPartnerClick: (partner: Partner) => void
   onPartnerMove: (partnerId: string, toStage: PipelineStage) => void
 }
 
-export function KanbanBoard({ partners, onPartnerClick, onPartnerMove }: KanbanBoardProps) {
+export function KanbanBoard({ kanban, onPartnerClick, onPartnerMove }: KanbanBoardProps) {
   const [activePartner, setActivePartner] = useState<Partner | null>(null)
 
+  const allPartners = Object.values(kanban).flatMap((s) => s.partners)
+
   function handleDragStart(event: DragStartEvent) {
-    const partner = partners.find((p) => p.id === event.active.id)
+    const partner = allPartners.find((p) => p.id === event.active.id)
     if (partner) setActivePartner(partner)
   }
 
@@ -27,7 +29,7 @@ export function KanbanBoard({ partners, onPartnerClick, onPartnerMove }: KanbanB
     const partnerId = active.id as string
     const targetStage = over.id as PipelineStage
 
-    const partner = partners.find((p) => p.id === partnerId)
+    const partner = allPartners.find((p) => p.id === partnerId)
     if (partner && partner.pipeline_stage !== targetStage) {
       onPartnerMove(partnerId, targetStage)
     }
@@ -41,14 +43,13 @@ export function KanbanBoard({ partners, onPartnerClick, onPartnerMove }: KanbanB
     >
       <div className="flex gap-4 h-full min-h-0">
         {PIPELINE_STAGES.map((stage) => {
-          const stagePartners = partners.filter(
-            (p) => p.pipeline_stage === stage.key
-          )
+          const stageData = kanban[stage.key]
           return (
             <KanbanColumn
               key={stage.key}
               stage={stage}
-              partners={stagePartners}
+              partners={stageData?.partners ?? []}
+              count={stageData?.count ?? 0}
               onPartnerClick={onPartnerClick}
             />
           )

@@ -5,10 +5,11 @@ import type { Partner, PipelineStage } from '../../types/partner'
 interface KanbanColumnProps {
   stage: { key: PipelineStage; label: string; color: string }
   partners: Partner[]
+  count: number
   onPartnerClick: (partner: Partner) => void
 }
 
-export function KanbanColumn({ stage, partners, onPartnerClick }: KanbanColumnProps) {
+export function KanbanColumn({ stage, partners, count, onPartnerClick }: KanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id: stage.key })
 
   return (
@@ -27,7 +28,7 @@ export function KanbanColumn({ stage, partners, onPartnerClick }: KanbanColumnPr
           <span className="text-sm font-semibold text-gray-700">{stage.label}</span>
         </div>
         <span className="text-xs font-bold text-gray-500 bg-white px-2 py-0.5 rounded-full">
-          {partners.length}
+          {count}
         </span>
       </div>
 
@@ -42,6 +43,11 @@ export function KanbanColumn({ stage, partners, onPartnerClick }: KanbanColumnPr
         {partners.length === 0 && (
           <div className="text-center py-8 text-xs text-gray-400">
             카드를 여기에 드래그하세요
+          </div>
+        )}
+        {partners.length < count && (
+          <div className="text-center py-2 text-xs text-gray-400">
+            +{count - partners.length}건 더 있음
           </div>
         )}
       </div>
