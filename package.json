@@ -20,6 +20,7 @@
     "better-sqlite3": "^11.9.1",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
+    "dotenv": "^17.4.1",
     "hono": "^4.12.12",
     "lucide-react": "^0.474.0",
     "react": "^19.1.0",

@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { X, Save, ExternalLink, CheckCircle, Clock, AlertTriangle, Send, History, MessageSquare, MapPin, FileText } from 'lucide-react'
-import { fetchPartnerDetail, updatePartner, updateDocument, addNote, movePartnerStage, fetchZones } from '../../lib/api'
+import { fetchPartnerDetail, updatePartner, updateDocument, addNote, movePartnerStage, fetchZones, triggerProposal, triggerDocRemind, triggerContractSend, triggerDriveFolder } from '../../lib/api'
 import { STATUS_LABELS, PIPELINE_STAGES } from '../../types/partner'
 import type { Partner, PartnerDocument, Contract, Zone, DocType, DocStatus } from '../../types/partner'
 
@@ -86,6 +86,8 @@ export function PartnerDetailModal({ partnerId, onClose, onUpdate }: Props) {
   const [rejectionDraft, setRejectionDraft] = useState<{ docType: DocType; reason: string } | null>(null)
   const [zoneResults, setZoneResults] = useState<Zone[]>([])
   const [showZoneSearch, setShowZoneSearch] = useState(false)
+  const [actionLoading, setActionLoading] = useState<string | null>(null)
+  const [actionResult, setActionResult] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
 
   const reload = useCallback(async () => {
     setLoading(true)
@@ -127,6 +129,25 @@ export function PartnerDetailModal({ partnerId, onClose, onUpdate }: Props) {
     if (reason) await addNote(partnerId, `[상태 변경] → ${stage}: ${reason}`, 'general')
     await reload()
     onUpdate()
+  }
+
+  const handleAction = async (actionName: string, fn: () => Promise<{ ok: boolean; dryRun: boolean }>) => {
+    setActionLoading(actionName)
+    setActionResult(null)
+    try {
+      const res = await fn()
+      setActionResult({
+        type: res.ok ? 'success' : 'error',
+        message: res.ok ? `${actionName} ${res.dryRun ? '(dry-run)' : ''} 완료` : `${actionName} 실패`,
+      })
+      await reload()
+      onUpdate()
+    } catch (e) {
+      setActionResult({ type: 'error', message: `${actionName} 오류: ${e instanceof Error ? e.message : 'Unknown'}` })
+    } finally {
+      setActionLoading(null)
+      setTimeout(() => setActionResult(null), 4000)
+    }
   }
 
   if (loading || !data) {
@@ -204,8 +225,13 @@ export function PartnerDetailModal({ partnerId, onClose, onUpdate }: Props) {
               <section>
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="text-sm font-bold text-blue-600">인바운드 정보</h3>
-                  <button className="text-xs px-3 py-1.5 border border-blue-300 text-blue-600 rounded-lg hover:bg-blue-50 font-medium">
-                    <Send size={12} className="inline mr-1" />보안 제안서 발송
+                  <button
+                    onClick={() => handleAction('제안서 발송', () => triggerProposal(partnerId))}
+                    disabled={actionLoading !== null}
+                    className="text-xs px-3 py-1.5 border border-blue-300 text-blue-600 rounded-lg hover:bg-blue-50 font-medium disabled:opacity-50"
+                  >
+                    <Send size={12} className="inline mr-1" />
+                    {actionLoading === '제안서 발송' ? '발송 중...' : '보안 제안서 발송'}
                   </button>
                 </div>
                 <dl className="grid grid-cols-4 gap-x-6 gap-y-3">
@@ -454,30 +480,77 @@ export function PartnerDetailModal({ partnerId, onClose, onUpdate }: Props) {
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between px-6 py-4 border-t border-gray-100 bg-gray-50/50 shrink-0">
-          <button onClick={onClose} className="text-sm px-4 py-2 border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-100">닫기</button>
-          <div className="flex gap-2">
-            {partner.pipeline_stage === 'contracting' && (
-              <button className="text-sm px-4 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700 font-medium">
-                <ExternalLink size={14} className="inline mr-1" />싸인오케이 발송
-              </button>
-            )}
-            {partner.pipeline_stage === 'operating' && (
-              <button className="text-sm px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium">BRMS Export</button>
-            )}
-            {partner.pipeline_stage !== 'operating' && partner.pipeline_stage !== 'terminated' && (
-              <button
-                onClick={() => {
-                  const stages = PIPELINE_STAGES.map(s => s.key)
-                  const currentIdx = stages.indexOf(partner.pipeline_stage)
-                  const nextStage = stages[currentIdx + 1]
-                  if (nextStage) handleStageMove(nextStage)
-                }}
-                className="text-sm px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
-              >
-                다음 단계로 이동
-              </button>
-            )}
+        <div className="flex flex-col gap-2 px-6 py-4 border-t border-gray-100 bg-gray-50/50 shrink-0">
+          {actionResult && (
+            <div className={`text-xs px-3 py-2 rounded-lg ${
+              actionResult.type === 'success' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'
+            }`}>
+              {actionResult.message}
+            </div>
+          )}
+          <div className="flex items-center justify-between">
+            <button onClick={onClose} className="text-sm px-4 py-2 border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-100">닫기</button>
+            <div className="flex gap-2">
+              {/* Drive 폴더 생성 */}
+              {!partner.drive_folder_link && partner.pipeline_stage !== 'inbound' && (
+                <button
+                  onClick={() => handleAction('Drive 폴더', () => triggerDriveFolder(partnerId))}
+                  disabled={actionLoading !== null}
+                  className="text-sm px-3 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+                >
+                  {actionLoading === 'Drive 폴더' ? '생성 중...' : 'Drive 폴더 생성'}
+                </button>
+              )}
+
+              {/* 서류 보완 알림톡 */}
+              {partner.pipeline_stage === 'doc_review' && (
+                <button
+                  onClick={() => handleAction('알림톡', () => triggerDocRemind(partnerId))}
+                  disabled={actionLoading !== null}
+                  className="text-sm px-3 py-2 border border-amber-300 text-amber-700 rounded-lg hover:bg-amber-50 disabled:opacity-50"
+                >
+                  <AlertTriangle size={14} className="inline mr-1" />
+                  {actionLoading === '알림톡' ? '발송 중...' : '서류 보완 알림톡'}
+                </button>
+              )}
+
+              {/* 싸인오케이 발송 */}
+              {partner.pipeline_stage === 'contracting' && partner.status !== 'contract_sent' && partner.status !== 'contract_signed' && (
+                <button
+                  onClick={() => handleAction('싸인오케이', () => triggerContractSend(partnerId))}
+                  disabled={actionLoading !== null}
+                  className="text-sm px-4 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700 font-medium disabled:opacity-50"
+                >
+                  <ExternalLink size={14} className="inline mr-1" />
+                  {actionLoading === '싸인오케이' ? '발송 중...' : '싸인오케이 발송'}
+                </button>
+              )}
+
+              {/* BRMS Export */}
+              {partner.pipeline_stage === 'operating' && (
+                <button
+                  onClick={() => window.open('http://localhost:3001/api/partners/export/brms-partner', '_blank')}
+                  className="text-sm px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
+                >
+                  BRMS Export
+                </button>
+              )}
+
+              {/* 다음 단계 */}
+              {partner.pipeline_stage !== 'operating' && partner.pipeline_stage !== 'terminated' && (
+                <button
+                  onClick={() => {
+                    const stages = PIPELINE_STAGES.map(s => s.key)
+                    const currentIdx = stages.indexOf(partner.pipeline_stage)
+                    const nextStage = stages[currentIdx + 1]
+                    if (nextStage) handleStageMove(nextStage)
+                  }}
+                  className="text-sm px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
+                >
+                  다음 단계로 이동
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>

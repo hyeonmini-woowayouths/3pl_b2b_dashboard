@@ -88,6 +88,38 @@ export function addNote(partnerId: string, content: string, note_type?: string) 
   })
 }
 
+// ── Integrations ──
+
+export function triggerProposal(partnerId: string) {
+  return request<{ ok: boolean; dryRun: boolean }>('/integrations/proposal', {
+    method: 'POST', body: JSON.stringify({ partnerId }),
+  })
+}
+
+export function triggerDocRemind(partnerId: string) {
+  return request<{ ok: boolean; dryRun: boolean; docsReminded: number }>('/integrations/doc-remind', {
+    method: 'POST', body: JSON.stringify({ partnerId }),
+  })
+}
+
+export function triggerDriveFolder(partnerId: string) {
+  return request<{ ok: boolean; dryRun: boolean }>('/integrations/drive-folder', {
+    method: 'POST', body: JSON.stringify({ partnerId }),
+  })
+}
+
+export function triggerContractSend(partnerId: string) {
+  return request<{ ok: boolean; dryRun: boolean; template: string; documentId?: string }>('/integrations/contract-send', {
+    method: 'POST', body: JSON.stringify({ partnerId }),
+  })
+}
+
+export function triggerSlackNotify(event: string, partnerId: string, companyName: string, details: string) {
+  return request<{ ok: boolean; dryRun: boolean }>('/integrations/slack-notify', {
+    method: 'POST', body: JSON.stringify({ event, partnerId, companyName, details }),
+  })
+}
+
 // ── Zones ──
 
 export function fetchZones(search?: string, openOnly?: boolean) {
