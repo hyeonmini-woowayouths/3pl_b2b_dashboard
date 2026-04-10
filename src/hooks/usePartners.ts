@@ -1,12 +1,13 @@
 import { useState, useEffect, useCallback } from 'react'
 import { fetchKanban, movePartnerStage } from '../lib/api'
+import type { KanbanFilters } from '../lib/api'
 import type { Partner, PipelineStage } from '../types/partner'
 
 interface KanbanState {
   [stage: string]: { count: number; partners: Partner[] }
 }
 
-export function usePartners(searchQuery: string) {
+export function usePartners(filters: KanbanFilters) {
   const [kanban, setKanban] = useState<KanbanState>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -14,7 +15,7 @@ export function usePartners(searchQuery: string) {
   const load = useCallback(async () => {
     try {
       setLoading(true)
-      const data = await fetchKanban(searchQuery || undefined)
+      const data = await fetchKanban(filters)
       setKanban(data)
       setError(null)
     } catch (e) {
@@ -22,10 +23,11 @@ export function usePartners(searchQuery: string) {
     } finally {
       setLoading(false)
     }
-  }, [searchQuery])
+  }, [JSON.stringify(filters)])
 
   useEffect(() => {
-    load()
+    const timer = setTimeout(load, 300) // debounce
+    return () => clearTimeout(timer)
   }, [load])
 
   const movePartner = useCallback(
@@ -40,7 +42,5 @@ export function usePartners(searchQuery: string) {
     [load]
   )
 
-  const allPartners = Object.values(kanban).flatMap((s) => s.partners)
-
-  return { kanban, allPartners, loading, error, movePartner, reload: load }
+  return { kanban, loading, error, movePartner, reload: load }
 }

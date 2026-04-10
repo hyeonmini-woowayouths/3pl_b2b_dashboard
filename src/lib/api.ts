@@ -21,9 +21,23 @@ export interface KanbanData {
   }
 }
 
-export function fetchKanban(search?: string): Promise<KanbanData> {
-  const params = search ? `?search=${encodeURIComponent(search)}` : ''
-  return request(`/partners/kanban${params}`)
+export interface KanbanFilters {
+  search?: string
+  dateFrom?: string
+  dateTo?: string
+  contractType?: string
+  statuses?: string[]
+}
+
+export function fetchKanban(filters?: KanbanFilters): Promise<KanbanData> {
+  const params = new URLSearchParams()
+  if (filters?.search) params.set('search', filters.search)
+  if (filters?.dateFrom) params.set('date_from', filters.dateFrom)
+  if (filters?.dateTo) params.set('date_to', filters.dateTo)
+  if (filters?.contractType && filters.contractType !== 'all') params.set('contract_type', filters.contractType)
+  if (filters?.statuses?.length) params.set('statuses', filters.statuses.join(','))
+  const qs = params.toString()
+  return request(`/partners/kanban${qs ? `?${qs}` : ''}`)
 }
 
 export function fetchPartnerDetail(id: string) {
@@ -58,6 +72,20 @@ export function fetchStats() {
     recentWeekInbound: number
     contractTypeBreakdown: { contract_type: string; count: number }[]
   }>('/partners/stats/summary')
+}
+
+export function updateDocument(partnerId: string, doc_type: string, status: string, rejection_reason?: string) {
+  return request<{ ok: boolean }>(`/partners/${partnerId}/documents`, {
+    method: 'POST',
+    body: JSON.stringify({ doc_type, status, rejection_reason }),
+  })
+}
+
+export function addNote(partnerId: string, content: string, note_type?: string) {
+  return request<{ ok: boolean }>(`/partners/${partnerId}/notes`, {
+    method: 'POST',
+    body: JSON.stringify({ content, note_type }),
+  })
 }
 
 // ── Zones ──

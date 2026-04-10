@@ -2,14 +2,24 @@ import { useState } from 'react'
 import { Sidebar } from './components/layout/Sidebar'
 import { TopHeader } from './components/layout/TopHeader'
 import { KanbanBoard } from './components/kanban/KanbanBoard'
+import { KanbanFilters, DEFAULT_FILTERS } from './components/kanban/KanbanFilters'
+import type { FilterState } from './components/kanban/KanbanFilters'
 import { PartnerDetailModal } from './components/partner/PartnerDetailModal'
 import { usePartners } from './hooks/usePartners'
 import type { Partner } from './types/partner'
 
 export default function App() {
   const [searchQuery, setSearchQuery] = useState('')
+  const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS)
   const [selectedPartnerId, setSelectedPartnerId] = useState<string | null>(null)
-  const { kanban, loading, error, movePartner, reload } = usePartners(searchQuery)
+
+  const { kanban, loading, error, movePartner, reload } = usePartners({
+    search: searchQuery || undefined,
+    dateFrom: filters.dateFrom || undefined,
+    dateTo: filters.dateTo || undefined,
+    contractType: filters.contractType,
+    statuses: filters.statuses.length > 0 ? filters.statuses : undefined,
+  })
 
   const handlePartnerClick = (partner: Partner) => {
     setSelectedPartnerId(partner.id)
@@ -23,10 +33,14 @@ export default function App() {
         <TopHeader
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
-          onAddPartner={() => {/* TODO: 신규 인바운드 모달 */}}
+          onAddPartner={() => {/* TODO */}}
         />
 
-        <div className="flex-1 overflow-auto p-6">
+        <div className="px-6 pt-4 pb-2">
+          <KanbanFilters filters={filters} onChange={setFilters} />
+        </div>
+
+        <div className="flex-1 overflow-auto px-6 pb-6">
           {error && (
             <div className="mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
               API 연결 실패: {error}

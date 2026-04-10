@@ -1,9 +1,43 @@
-import { Bell, Search, Plus } from 'lucide-react'
+import { useState } from 'react'
+import { Bell, Search, Plus, Download, ChevronDown } from 'lucide-react'
 
 interface TopHeaderProps {
   searchQuery: string
   onSearchChange: (q: string) => void
   onAddPartner: () => void
+}
+
+function ExportDropdown() {
+  const [open, setOpen] = useState(false)
+  const downloadCsv = (type: 'brms-business' | 'brms-partner') => {
+    window.open(`http://localhost:3001/api/partners/export/${type}`, '_blank')
+    setOpen(false)
+  }
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setOpen(!open)}
+        className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 text-sm text-gray-700 rounded-lg hover:bg-gray-50"
+      >
+        <Download size={14} /> Export <ChevronDown size={12} />
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 top-full mt-1 z-20 bg-white border border-gray-200 rounded-lg shadow-lg py-1 w-64">
+            <button onClick={() => downloadCsv('brms-business')} className="w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50">
+              <div className="font-medium text-gray-900">BRMS 사업자 등록 CSV</div>
+              <div className="text-xs text-gray-500">계약 완료 건 — 사업자 정보 (건별 등록용)</div>
+            </button>
+            <button onClick={() => downloadCsv('brms-partner')} className="w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50">
+              <div className="font-medium text-gray-900">BRMS 협력사 대량등록 CSV</div>
+              <div className="text-xs text-gray-500">계약 완료 건 — 협력사/비즈/권역 정보</div>
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  )
 }
 
 export function TopHeader({ searchQuery, onSearchChange, onAddPartner }: TopHeaderProps) {
@@ -22,6 +56,8 @@ export function TopHeader({ searchQuery, onSearchChange, onAddPartner }: TopHead
             className="pl-9 pr-4 py-2 w-72 text-sm border border-gray-200 rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           />
         </div>
+
+        <ExportDropdown />
 
         <button
           onClick={onAddPartner}
