@@ -34,36 +34,65 @@ function EditableField({ label, value, onSave, type = 'text' }: {
 }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(value ?? '')
+  const [saving, setSaving] = useState(false)
+
+  const handleSave = async () => {
+    setSaving(true)
+    await onSave(draft)
+    setSaving(false)
+    setEditing(false)
+  }
 
   if (!editing) {
     return (
-      <div className="group cursor-pointer" onClick={() => { setDraft(value ?? ''); setEditing(true) }}>
-        <dt className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">{label}</dt>
-        <dd className="mt-0.5 text-sm text-gray-900 min-h-[20px] group-hover:bg-blue-50 group-hover:rounded px-1 -mx-1 transition-colors">
-          {value || <span className="text-gray-300">클릭하여 입력</span>}
+      <div
+        className="group cursor-pointer rounded-lg px-2.5 py-1.5 -mx-2.5 -my-1.5 hover:bg-blue-50/70 transition-colors border border-transparent hover:border-blue-200"
+        onClick={() => { setDraft(value ?? ''); setEditing(true) }}
+      >
+        <dt className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide flex items-center gap-1">
+          {label}
+          <svg className="w-2.5 h-2.5 text-blue-400 opacity-0 group-hover:opacity-100 transition-opacity" viewBox="0 0 12 12" fill="currentColor">
+            <path d="M9.1 1.4L10.6 2.9 3.5 10H2V8.5L9.1 1.4Z"/>
+          </svg>
+        </dt>
+        <dd className="mt-0.5 text-sm text-gray-900 min-h-[22px]">
+          {value || <span className="text-gray-400 italic text-xs">비어있음</span>}
         </dd>
       </div>
     )
   }
 
   return (
-    <div>
-      <dt className="text-[11px] font-semibold text-blue-600 uppercase tracking-wide">{label}</dt>
-      <div className="flex gap-1 mt-0.5">
-        <input
-          type={type}
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter') { onSave(draft); setEditing(false) } if (e.key === 'Escape') setEditing(false) }}
-          autoFocus
-          className="flex-1 text-sm px-2 py-1 border border-blue-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
-        />
-        <button onClick={() => { onSave(draft); setEditing(false) }} className="text-xs px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700">
-          <Save size={12} />
-        </button>
-        <button onClick={() => setEditing(false)} className="text-xs px-2 py-1 border border-gray-300 rounded hover:bg-gray-100">
-          <X size={12} />
-        </button>
+    <div className="rounded-lg px-2.5 py-1.5 -mx-2.5 -my-1.5 bg-blue-50 border border-blue-200">
+      <dt className="text-[11px] font-semibold text-blue-600 uppercase tracking-wide mb-1">{label}</dt>
+      <input
+        type={type}
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') handleSave()
+          if (e.key === 'Escape') setEditing(false)
+        }}
+        onBlur={() => {
+          // 값이 변경됐으면 자동 저장, 아니면 취소
+          if (draft !== (value ?? '')) handleSave()
+          else setEditing(false)
+        }}
+        autoFocus
+        disabled={saving}
+        className="w-full text-sm px-2.5 py-1.5 bg-white border border-blue-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:outline-none disabled:opacity-50"
+        placeholder={`${label} 입력...`}
+      />
+      <div className="flex items-center justify-between mt-1.5">
+        <span className="text-[10px] text-blue-500">Enter 저장 / Esc 취소</span>
+        <div className="flex gap-1">
+          <button onClick={handleSave} disabled={saving} className="text-[10px] px-2 py-0.5 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50">
+            {saving ? '...' : '저장'}
+          </button>
+          <button onClick={() => setEditing(false)} className="text-[10px] px-2 py-0.5 text-gray-500 hover:text-gray-700">
+            취소
+          </button>
+        </div>
       </div>
     </div>
   )
@@ -71,9 +100,9 @@ function EditableField({ label, value, onSave, type = 'text' }: {
 
 function InfoField({ label, value }: { label: string; value: string | null | undefined }) {
   return (
-    <div>
-      <dt className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">{label}</dt>
-      <dd className="mt-0.5 text-sm text-gray-900 min-h-[20px]">{value ?? '-'}</dd>
+    <div className="px-2.5 py-1.5 -mx-2.5 -my-1.5">
+      <dt className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide">{label}</dt>
+      <dd className="mt-0.5 text-sm text-gray-900 min-h-[22px]">{value ?? <span className="text-gray-300">-</span>}</dd>
     </div>
   )
 }
