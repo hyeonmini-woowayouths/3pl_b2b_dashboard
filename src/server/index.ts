@@ -8,12 +8,14 @@ import partners from './partners'
 import zones from './zones'
 import integrations from './integrations'
 import { integrationConfig } from './integrations/config'
+import { authMiddleware } from './auth'
 
 const app = new Hono()
 
 // Middleware
 app.use('*', logger())
 app.use('*', cors({ origin: ['http://localhost:5173', 'http://localhost:5174'], credentials: true }))
+app.use('/api/*', authMiddleware)
 
 // Routes
 app.route('/api/partners', partners)

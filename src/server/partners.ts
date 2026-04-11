@@ -255,6 +255,65 @@ app.patch('/:id', async (c) => {
   return c.json({ ok: true })
 })
 
+// ── POST /api/partners/apply — F-16: 외부 셀프서비스 접수 ──
+app.post('/apply', async (c) => {
+  const db = getDb()
+  const body = await c.req.json<{
+    company_name: string
+    applicant_name: string
+    email: string
+    phone: string
+    business_type: string
+    business_number: string
+    desired_region_text: string
+    experience_years?: string
+    rider_count?: string
+    platform_experience?: string
+    comment?: string
+    terms_agreed: boolean
+  }>()
+
+  if (!body.terms_agreed) return c.json({ error: '약관 동의가 필요합니다' }, 400)
+  if (!body.company_name || !body.business_number || !body.email) {
+    return c.json({ error: '필수 항목을 입력하세요' }, 400)
+  }
+
+  // 간이과세자 차단
+  if (body.business_type === '간이과세') {
+    return c.json({ error: '간이과세자는 신청할 수 없습니다. 일반과세 사업자 또는 법인사업자만 가능합니다.' }, 400)
+  }
+
+  // 중복 사업자번호 체크
+  const existing = db.prepare(
+    "SELECT id, pipeline_stage, status FROM partners WHERE business_number = ? AND deleted_at IS NULL AND pipeline_stage != 'terminated'"
+  ).get(body.business_number) as { id: string; pipeline_stage: string; status: string } | undefined
+
+  if (existing) {
+    return c.json({ error: `이미 등록된 사업자입니다 (현재 상태: ${existing.pipeline_stage}/${existing.status})` }, 409)
+  }
+
+  const now = new Date().toISOString()
+  const id = `p_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+
+  db.prepare(`
+    INSERT INTO partners (
+      id, contract_type, pipeline_stage, status,
+      apply_date, company_name, applicant_name, email, phone,
+      business_type, business_number, desired_region_text,
+      experience_years, rider_count, platform_experience, comment,
+      created_at, updated_at
+    ) VALUES (?, 'direct', 'inbound', 'submitted', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    id, now.slice(0, 10), body.company_name, body.applicant_name, body.email, body.phone,
+    body.business_type, body.business_number, body.desired_region_text,
+    body.experience_years ?? null, body.rider_count ?? null,
+    body.platform_experience ?? null, body.comment ?? null,
+    now, now,
+  )
+
+  return c.json({ ok: true, id, message: '신청이 접수되었습니다. 검토 후 안내드리겠습니다.' })
+})
+
 // ── POST /api/partners/:id/documents — 서류 생성/업데이트 ──
 app.post('/:id/documents', async (c) => {
   const db = getDb()
@@ -386,7 +445,46 @@ app.get('/stats/summary', (c) => {
     GROUP BY contract_type
   `).all()
 
-  return c.json({ stageCounts, recentWeekInbound: recentWeek.count, contractTypeBreakdown })
+  // 주간 인바운드 추이 (최근 12주)
+  const weeklyTrend = db.prepare(`
+    SELECT strftime('%Y-W%W', apply_date) as week, COUNT(*) as count
+    FROM partners
+    WHERE deleted_at IS NULL AND apply_date >= date('now', '-84 days')
+    GROUP BY week ORDER BY week
+  `).all()
+
+  // 평균 단계별 소요일 (inbound → operating)
+  const avgDays = db.prepare(`
+    SELECT
+      pipeline_stage,
+      ROUND(AVG(julianday(updated_at) - julianday(apply_date)), 1) as avg_days
+    FROM partners
+    WHERE deleted_at IS NULL AND apply_date IS NOT NULL
+    GROUP BY pipeline_stage
+  `).all()
+
+  // 상태별 분포
+  const statusBreakdown = db.prepare(`
+    SELECT status, COUNT(*) as count
+    FROM partners WHERE deleted_at IS NULL
+    GROUP BY status ORDER BY count DESC
+    LIMIT 15
+  `).all()
+
+  // 권역별 분포 (top 15)
+  const zoneBreakdown = db.prepare(`
+    SELECT z.zone_code, z.region_class, COUNT(*) as count
+    FROM partners p
+    JOIN zones z ON z.id = p.confirmed_zone_id
+    WHERE p.deleted_at IS NULL AND p.pipeline_stage NOT IN ('terminated')
+    GROUP BY z.zone_code ORDER BY count DESC
+    LIMIT 15
+  `).all()
+
+  return c.json({
+    stageCounts, recentWeekInbound: recentWeek.count, contractTypeBreakdown,
+    weeklyTrend, avgDays, statusBreakdown, zoneBreakdown,
+  })
 })
 
 export default app
