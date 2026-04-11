@@ -5,6 +5,7 @@ import { KanbanBoard } from '../components/kanban/KanbanBoard'
 import { KanbanFilters, DEFAULT_FILTERS } from '../components/kanban/KanbanFilters'
 import type { FilterState } from '../components/kanban/KanbanFilters'
 import { PartnerDetailModal } from '../components/partner/PartnerDetailModal'
+import { NewPartnerModal } from '../components/partner/NewPartnerModal'
 import { usePartners } from '../hooks/usePartners'
 import type { Partner } from '../types/partner'
 
@@ -12,6 +13,7 @@ export function DashboardPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS)
   const [selectedPartnerId, setSelectedPartnerId] = useState<string | null>(null)
+  const [showNewPartner, setShowNewPartner] = useState(false)
 
   const { kanban, loading, error, movePartner, reload } = usePartners({
     search: searchQuery || undefined,
@@ -33,7 +35,7 @@ export function DashboardPage() {
         <TopHeader
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
-          onAddPartner={() => {/* TODO: 신규 인바운드 모달 */}}
+          onAddPartner={() => setShowNewPartner(true)}
         />
 
         <div className="px-6 pt-4 pb-2">
@@ -67,6 +69,13 @@ export function DashboardPage() {
           partnerId={selectedPartnerId}
           onClose={() => setSelectedPartnerId(null)}
           onUpdate={reload}
+        />
+      )}
+
+      {showNewPartner && (
+        <NewPartnerModal
+          onClose={() => setShowNewPartner(false)}
+          onCreated={reload}
         />
       )}
     </div>

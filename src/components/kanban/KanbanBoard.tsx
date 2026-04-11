@@ -1,4 +1,7 @@
-import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, closestCenter } from '@dnd-kit/core'
+import {
+  DndContext, DragEndEvent, DragOverlay, DragStartEvent,
+  closestCenter, PointerSensor, useSensor, useSensors,
+} from '@dnd-kit/core'
 import { useState } from 'react'
 import { KanbanColumn } from './KanbanColumn'
 import { PartnerCard } from './PartnerCard'
@@ -13,6 +16,11 @@ interface KanbanBoardProps {
 
 export function KanbanBoard({ kanban, onPartnerClick, onPartnerMove }: KanbanBoardProps) {
   const [activePartner, setActivePartner] = useState<Partner | null>(null)
+
+  // 8px 이상 움직여야 드래그 시작 — 그 미만은 클릭으로 처리
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
+  )
 
   const allPartners = Object.values(kanban).flatMap((s) => s.partners)
 
@@ -37,6 +45,7 @@ export function KanbanBoard({ kanban, onPartnerClick, onPartnerMove }: KanbanBoa
 
   return (
     <DndContext
+      sensors={sensors}
       collisionDetection={closestCenter}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}

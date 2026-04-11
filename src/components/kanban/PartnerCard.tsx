@@ -49,9 +49,15 @@ export function PartnerCard({ partner, onClick }: PartnerCardProps) {
       ref={setNodeRef}
       {...listeners}
       {...attributes}
-      onClick={onClick}
-      className={`bg-white rounded-lg border p-3 cursor-grab active:cursor-grabbing transition-all hover:shadow-md ${
-        isDragging ? 'opacity-50 shadow-lg' : ''
+      onClick={(e) => {
+        // 드래그 중이 아닐 때만 클릭 처리
+        if (!isDragging) {
+          e.stopPropagation()
+          onClick()
+        }
+      }}
+      className={`bg-white rounded-lg border p-3 cursor-pointer hover:shadow-md transition-all select-none ${
+        isDragging ? 'opacity-50 shadow-lg cursor-grabbing' : ''
       } ${isWarning ? 'border-red-200 bg-red-50/30' : 'border-gray-200'}`}
     >
       <div className="flex items-start justify-between mb-2">
