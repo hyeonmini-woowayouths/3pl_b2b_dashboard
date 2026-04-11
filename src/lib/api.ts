@@ -1,13 +1,23 @@
 const API_BASE = 'http://localhost:3001/api'
 
+export class ApiError extends Error {
+  constructor(message: string, public status: number, public errors?: string[]) {
+    super(message)
+  }
+}
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     headers: { 'Content-Type': 'application/json', ...options?.headers },
     ...options,
   })
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: res.statusText }))
-    throw new Error((err as { error?: string }).error || res.statusText)
+    const err = await res.json().catch(() => ({ error: res.statusText })) as { error?: string; errors?: string[] }
+    throw new ApiError(
+      err.errors ? err.errors.join('\n') : err.error || res.statusText,
+      res.status,
+      err.errors,
+    )
   }
   return res.json() as Promise<T>
 }
@@ -52,10 +62,10 @@ export function fetchPartnerDetail(id: string) {
   }>(`/partners/${id}`)
 }
 
-export function movePartnerStage(id: string, pipeline_stage: string, status?: string) {
-  return request<{ ok: boolean }>(`/partners/${id}/stage`, {
+export function movePartnerStage(id: string, pipeline_stage: string, status?: string, reason?: string) {
+  return request<{ ok: boolean; errors?: string[] }>(`/partners/${id}/stage`, {
     method: 'PATCH',
-    body: JSON.stringify({ pipeline_stage, status }),
+    body: JSON.stringify({ pipeline_stage, status, reason }),
   })
 }
 

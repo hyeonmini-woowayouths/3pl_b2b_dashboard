@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
-import { fetchKanban, movePartnerStage } from '../lib/api'
+import { fetchKanban } from '../lib/api'
 import type { KanbanFilters } from '../lib/api'
-import type { Partner, PipelineStage } from '../types/partner'
+import type { Partner } from '../types/partner'
 
 interface KanbanState {
   [stage: string]: { count: number; partners: Partner[] }
@@ -26,21 +26,9 @@ export function usePartners(filters: KanbanFilters) {
   }, [JSON.stringify(filters)])
 
   useEffect(() => {
-    const timer = setTimeout(load, 300) // debounce
+    const timer = setTimeout(load, 300)
     return () => clearTimeout(timer)
   }, [load])
 
-  const movePartner = useCallback(
-    async (partnerId: string, toStage: PipelineStage) => {
-      try {
-        await movePartnerStage(partnerId, toStage)
-        await load()
-      } catch (e) {
-        setError(e instanceof Error ? e.message : 'Failed to move')
-      }
-    },
-    [load]
-  )
-
-  return { kanban, loading, error, movePartner, reload: load }
+  return { kanban, loading, error, reload: load }
 }

@@ -1,4 +1,3 @@
-import { useDroppable } from '@dnd-kit/core'
 import { PartnerCard } from './PartnerCard'
 import type { Partner, PipelineStage } from '../../types/partner'
 
@@ -10,15 +9,8 @@ interface KanbanColumnProps {
 }
 
 export function KanbanColumn({ stage, partners, count, onPartnerClick }: KanbanColumnProps) {
-  const { setNodeRef, isOver } = useDroppable({ id: stage.key })
-
   return (
-    <div
-      ref={setNodeRef}
-      className={`flex-1 min-w-[280px] max-w-[340px] flex flex-col rounded-xl transition-colors ${
-        isOver ? 'bg-blue-50 ring-2 ring-blue-300' : 'bg-gray-100/70'
-      }`}
-    >
+    <div className="flex-1 min-w-[280px] max-w-[340px] flex flex-col rounded-xl bg-gray-100/70">
       <div className="flex items-center justify-between px-4 py-3">
         <div className="flex items-center gap-2">
           <div
@@ -42,7 +34,7 @@ export function KanbanColumn({ stage, partners, count, onPartnerClick }: KanbanC
         ))}
         {partners.length === 0 && (
           <div className="text-center py-8 text-xs text-gray-400">
-            카드를 여기에 드래그하세요
+            해당 단계에 협력사가 없습니다
           </div>
         )}
         {partners.length < count && (

@@ -183,17 +183,75 @@ app.get('/:id', (c) => {
   return c.json({ partner, documents, contracts, bankAccounts, insurance, notes, statusHistory })
 })
 
-// ── PATCH /api/partners/:id/stage — 파이프라인 단계 변경 (칸반 드래그) ──
+// ── PATCH /api/partners/:id/stage — 파이프라인 단계 변경 (요건 검증 포함) ──
 app.patch('/:id/stage', async (c) => {
   const db = getDb()
   const id = c.req.param('id')
-  const body = await c.req.json<{ pipeline_stage: string; status?: string; reason?: string }>()
+  const body = await c.req.json<{ pipeline_stage: string; status?: string; reason?: string; force?: boolean }>()
 
-  const current = db.prepare('SELECT pipeline_stage, status FROM partners WHERE id = ?').get(id) as {
-    pipeline_stage: string; status: string
-  } | undefined
+  const partner = db.prepare('SELECT * FROM partners WHERE id = ?').get(id) as Record<string, string | null> | undefined
+  if (!partner) return c.json({ error: 'Not found' }, 404)
 
-  if (!current) return c.json({ error: 'Not found' }, 404)
+  const currentStage = partner.pipeline_stage
+  const targetStage = body.pipeline_stage
+
+  // ── 요건 검증 (force=true가 아닌 한) ──
+  if (!body.force) {
+    const errors: string[] = []
+
+    // inbound → doc_review: 제안서 발송 완료 필요
+    if (currentStage === 'inbound' && targetStage === 'doc_review') {
+      if (!partner.proposal_sent || partner.proposal_sent === 'N') {
+        errors.push('제안서가 아직 발송되지 않았습니다')
+      }
+      if (partner.business_type === '간이과세') {
+        errors.push('간이과세자는 진행할 수 없습니다')
+      }
+    }
+
+    // doc_review → contracting: 필수 서류 3종 승인 + 권역 확정
+    if (currentStage === 'doc_review' && targetStage === 'contracting') {
+      const approvedDocs = db.prepare(
+        "SELECT COUNT(*) as c FROM partner_documents WHERE partner_id = ? AND status = 'approved' AND doc_type IN ('business_cert','bank_statement','id_card')"
+      ).get(id) as { c: number }
+      if (approvedDocs.c < 3) {
+        errors.push(`필수 서류 ${approvedDocs.c}/3종 승인 — 사업자등록증, 통장 사본, 신분증 모두 승인 필요`)
+      }
+      if (!partner.confirmed_zone_id) {
+        errors.push('확정 권역이 지정되지 않았습니다 (Set Tracker 매핑 필요)')
+      }
+    }
+
+    // contracting → operating: 계약 체결 완료 필요
+    if (currentStage === 'contracting' && targetStage === 'operating') {
+      const signedContract = db.prepare(
+        "SELECT COUNT(*) as c FROM contracts WHERE partner_id = ? AND signok_status IN ('체결','signed')"
+      ).get(id) as { c: number }
+      if (signedContract.c === 0) {
+        errors.push('계약 체결이 완료되지 않았습니다')
+      }
+      if (!partner.dp_code) {
+        errors.push('BRMS 협력사 코드(DP)가 생성되지 않았습니다')
+      }
+    }
+
+    // 역방향 이동 차단 (terminated 제외)
+    const stageOrder = ['inbound', 'doc_review', 'contracting', 'operating']
+    const currentIdx = stageOrder.indexOf(currentStage ?? '')
+    const targetIdx = stageOrder.indexOf(targetStage)
+    if (currentIdx >= 0 && targetIdx >= 0 && targetIdx < currentIdx) {
+      errors.push(`${currentStage} → ${targetStage}: 이전 단계로는 이동할 수 없습니다`)
+    }
+
+    // 단계 건너뛰기 차단
+    if (currentIdx >= 0 && targetIdx >= 0 && targetIdx > currentIdx + 1) {
+      errors.push(`단계를 건너뛸 수 없습니다 (${currentStage} → ${targetStage})`)
+    }
+
+    if (errors.length > 0) {
+      return c.json({ ok: false, errors }, 422)
+    }
+  }
 
   const stageDefaults: Record<string, string> = {
     inbound: 'submitted',
@@ -203,7 +261,7 @@ app.patch('/:id/stage', async (c) => {
     terminated: 'contract_ended',
   }
 
-  const newStatus = body.status || stageDefaults[body.pipeline_stage] || current.status
+  const newStatus = body.status || stageDefaults[body.pipeline_stage] || partner.status
   const now = new Date().toISOString()
 
   db.prepare(`
@@ -213,7 +271,7 @@ app.patch('/:id/stage', async (c) => {
   db.prepare(`
     INSERT INTO partner_status_logs (id, partner_id, from_stage, from_status, to_stage, to_status, reason, created_at)
     VALUES (lower(hex(randomblob(16))), ?, ?, ?, ?, ?, ?, ?)
-  `).run(id, current.pipeline_stage, current.status, body.pipeline_stage, newStatus, body.reason || null, now)
+  `).run(id, currentStage, partner.status, body.pipeline_stage, newStatus, body.reason || null, now)
 
   return c.json({ ok: true, pipeline_stage: body.pipeline_stage, status: newStatus })
 })

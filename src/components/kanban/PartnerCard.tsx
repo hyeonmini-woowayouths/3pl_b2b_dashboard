@@ -1,4 +1,3 @@
-import { useDraggable } from '@dnd-kit/core'
 import { MapPin, User, AlertTriangle } from 'lucide-react'
 import { STATUS_LABELS } from '../../types/partner'
 import type { Partner } from '../../types/partner'
@@ -33,10 +32,6 @@ const STATUS_COLORS: Record<string, string> = {
 }
 
 export function PartnerCard({ partner, onClick }: PartnerCardProps) {
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
-    id: partner.id,
-  })
-
   const isWarning =
     partner.status === 'docs_rejected' ||
     partner.status === 'validation_failed' ||
@@ -46,19 +41,10 @@ export function PartnerCard({ partner, onClick }: PartnerCardProps) {
 
   return (
     <div
-      ref={setNodeRef}
-      {...listeners}
-      {...attributes}
-      onClick={(e) => {
-        // 드래그 중이 아닐 때만 클릭 처리
-        if (!isDragging) {
-          e.stopPropagation()
-          onClick()
-        }
-      }}
-      className={`bg-white rounded-lg border p-3 cursor-pointer hover:shadow-md transition-all select-none ${
-        isDragging ? 'opacity-50 shadow-lg cursor-grabbing' : ''
-      } ${isWarning ? 'border-red-200 bg-red-50/30' : 'border-gray-200'}`}
+      onClick={onClick}
+      className={`bg-white rounded-lg border p-3 cursor-pointer hover:shadow-md transition-all ${
+        isWarning ? 'border-red-200 bg-red-50/30' : 'border-gray-200'
+      }`}
     >
       <div className="flex items-start justify-between mb-2">
         <div className="flex-1 min-w-0">

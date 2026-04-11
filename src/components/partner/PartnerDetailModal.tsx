@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { X, Save, ExternalLink, CheckCircle, Clock, AlertTriangle, Send, History, MessageSquare, MapPin, FileText } from 'lucide-react'
-import { fetchPartnerDetail, updatePartner, updateDocument, addNote, movePartnerStage, fetchZones, triggerProposal, triggerDocRemind, triggerContractSend, triggerDriveFolder } from '../../lib/api'
+import { fetchPartnerDetail, updatePartner, updateDocument, addNote, movePartnerStage, fetchZones, triggerProposal, triggerDocRemind, triggerContractSend, triggerDriveFolder, ApiError } from '../../lib/api'
 import { STATUS_LABELS, PIPELINE_STAGES } from '../../types/partner'
 import type { Partner, PartnerDocument, Contract, Zone, DocType, DocStatus } from '../../types/partner'
 
@@ -153,11 +153,21 @@ export function PartnerDetailModal({ partnerId, onClose, onUpdate }: Props) {
   }
 
   const handleStageMove = async (stage: string) => {
-    const reason = prompt('변경 사유를 입력하세요 (선택)')
-    await movePartnerStage(partnerId, stage, undefined)
-    if (reason) await addNote(partnerId, `[상태 변경] → ${stage}: ${reason}`, 'general')
-    await reload()
-    onUpdate()
+    setActionResult(null)
+    try {
+      const reason = prompt('변경 사유를 입력하세요 (선택)')
+      await movePartnerStage(partnerId, stage, undefined, reason ?? undefined)
+      if (reason) await addNote(partnerId, `[상태 변경] → ${stage}: ${reason}`, 'general')
+      setActionResult({ type: 'success', message: '단계가 변경되었습니다' })
+      await reload()
+      onUpdate()
+    } catch (e) {
+      if (e instanceof ApiError && e.errors) {
+        setActionResult({ type: 'error', message: e.errors.join('\n') })
+      } else {
+        setActionResult({ type: 'error', message: e instanceof Error ? e.message : '이동 실패' })
+      }
+    }
   }
 
   const handleAction = async (actionName: string, fn: () => Promise<{ ok: boolean; dryRun: boolean }>) => {

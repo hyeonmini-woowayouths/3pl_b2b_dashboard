@@ -15,7 +15,7 @@ export function DashboardPage() {
   const [selectedPartnerId, setSelectedPartnerId] = useState<string | null>(null)
   const [showNewPartner, setShowNewPartner] = useState(false)
 
-  const { kanban, loading, error, movePartner, reload } = usePartners({
+  const { kanban, loading, error, reload } = usePartners({
     search: searchQuery || undefined,
     dateFrom: filters.dateFrom || undefined,
     dateTo: filters.dateTo || undefined,
@@ -58,7 +58,6 @@ export function DashboardPage() {
             <KanbanBoard
               kanban={kanban}
               onPartnerClick={handlePartnerClick}
-              onPartnerMove={movePartner}
             />
           )}
         </div>
