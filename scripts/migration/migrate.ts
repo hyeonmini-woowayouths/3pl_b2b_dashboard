@@ -34,6 +34,13 @@ function ensureDir(dir: string) {
 
 function normalizeDate(val: unknown): string | null {
   if (val == null || val === '' || val === '-' || val === '#N/A' || val === '#REF!') return null
+
+  // JS Date 객체 (cellDates: true 사용 시)
+  if (val instanceof Date) {
+    if (isNaN(val.getTime())) return null
+    return val.toISOString().slice(0, 10)
+  }
+
   const s = String(val).trim()
 
   // "20240507" 형태
@@ -49,14 +56,29 @@ function normalizeDate(val: unknown): string | null {
   if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
     return s.slice(0, 10)
   }
+  // "Thu May 02 2024 ..." 형태 (JS Date.toString())
+  const dateStrMatch = s.match(/^[A-Z][a-z]{2}\s+([A-Z][a-z]{2})\s+(\d{1,2})\s+(\d{4})/)
+  if (dateStrMatch) {
+    const months: Record<string, string> = {
+      Jan:'01',Feb:'02',Mar:'03',Apr:'04',May:'05',Jun:'06',
+      Jul:'07',Aug:'08',Sep:'09',Oct:'10',Nov:'11',Dec:'12'
+    }
+    const m = months[dateStrMatch[1]!]
+    if (m) return `${dateStrMatch[3]}-${m}-${dateStrMatch[2]!.padStart(2, '0')}`
+  }
   // Excel serial date number
   const num = Number(s)
   if (!isNaN(num) && num > 40000 && num < 50000) {
     const date = new Date((num - 25569) * 86400 * 1000)
     return date.toISOString().slice(0, 10)
   }
+  // 어떤 형식이든 Date로 파싱 시도
+  const parsed = new Date(s)
+  if (!isNaN(parsed.getTime()) && parsed.getFullYear() >= 2020 && parsed.getFullYear() <= 2030) {
+    return parsed.toISOString().slice(0, 10)
+  }
 
-  return s.length > 10 ? s.slice(0, 10) : s
+  return null // 파싱 불가능한 날짜는 null
 }
 
 function normalizeStr(val: unknown): string | null {
