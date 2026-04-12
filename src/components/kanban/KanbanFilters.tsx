@@ -36,7 +36,32 @@ export function KanbanFilters({ filters, onChange }: KanbanFiltersProps) {
 
   return (
     <div className="flex items-center gap-3 flex-wrap">
-      {/* 날짜 범위 */}
+      {/* 기간 프리셋 */}
+      <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-0.5">
+        {[
+          { label: '7일', days: 7 },
+          { label: '30일', days: 30 },
+          { label: '90일', days: 90 },
+          { label: '전체', days: 0 },
+        ].map((p) => {
+          const isActive = p.days === 0
+            ? !filters.dateFrom
+            : filters.dateFrom === daysAgo(p.days)
+          return (
+            <button
+              key={p.label}
+              onClick={() => onChange({ ...filters, dateFrom: p.days ? daysAgo(p.days) : '', dateTo: '' })}
+              className={`px-2.5 py-1.5 text-xs rounded-md transition-colors ${
+                isActive ? 'bg-white text-blue-700 font-semibold shadow-sm' : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              {p.label}
+            </button>
+          )
+        })}
+      </div>
+
+      {/* 날짜 직접 선택 */}
       <div className="flex items-center gap-1.5 text-sm">
         <Calendar size={14} className="text-gray-400" />
         <input
@@ -44,7 +69,6 @@ export function KanbanFilters({ filters, onChange }: KanbanFiltersProps) {
           value={filters.dateFrom}
           onChange={(e) => onChange({ ...filters, dateFrom: e.target.value })}
           className="px-2 py-1.5 border border-gray-200 rounded-lg text-xs bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          placeholder="시작일"
         />
         <span className="text-gray-400 text-xs">~</span>
         <input
@@ -109,8 +133,14 @@ export function KanbanFilters({ filters, onChange }: KanbanFiltersProps) {
   )
 }
 
+function daysAgo(n: number): string {
+  const d = new Date()
+  d.setDate(d.getDate() - n)
+  return d.toISOString().slice(0, 10)
+}
+
 export const DEFAULT_FILTERS: FilterState = {
-  dateFrom: '',
+  dateFrom: daysAgo(30),
   dateTo: '',
   contractType: 'all',
   statuses: [],

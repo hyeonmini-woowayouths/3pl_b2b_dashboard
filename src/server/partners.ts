@@ -12,7 +12,8 @@ app.get('/', (c) => {
   const limit = Number(c.req.query('limit')) || 200
   const offset = Number(c.req.query('offset')) || 0
 
-  let where = "WHERE p.deleted_at IS NULL AND p.pipeline_stage != 'terminated'"
+  const includeTerminated = c.req.query('include_terminated') === 'true'
+  let where = `WHERE p.deleted_at IS NULL${includeTerminated ? '' : " AND p.pipeline_stage != 'terminated'"}`
   const params: unknown[] = []
 
   if (stage) {
@@ -20,9 +21,9 @@ app.get('/', (c) => {
     params.push(stage)
   }
   if (search) {
-    where += ' AND (p.company_name LIKE ? OR p.business_number LIKE ? OR p.applicant_name LIKE ?)'
+    where += ' AND (p.company_name LIKE ? OR p.business_number LIKE ? OR p.applicant_name LIKE ? OR p.dp_code LIKE ?)'
     const q = `%${search}%`
-    params.push(q, q, q)
+    params.push(q, q, q, q)
   }
   if (contractType) {
     where += ' AND p.contract_type = ?'

@@ -1,16 +1,11 @@
-import { LayoutDashboard, Users, FileText, ShieldCheck, Link as LinkIcon, Settings, HelpCircle, Layers, BarChart3 } from 'lucide-react'
+import { Users, Settings, HelpCircle, Layers } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
 
 const NAV_ITEMS = [
-  { icon: LayoutDashboard, label: '대시보드 홈', href: '/' },
   { icon: Users, label: '3PL 협력사 (DP)', href: '/', sub: [
     { label: '영입 파이프라인', href: '/' },
-    { label: '협력사 계약 리스트', href: '/' },
+    { label: '협력사 계약 리스트', href: '/partners' },
   ]},
-  { icon: BarChart3, label: '통계 & 리포트', href: '/stats' },
-  { icon: FileText, label: '루커스튜디오 리포트', href: '#' },
-  { icon: ShieldCheck, label: '정산/제재 관리', href: '#' },
-  { icon: LinkIcon, label: '외부 시스템 연동', href: '#' },
 ]
 
 export function Sidebar() {
