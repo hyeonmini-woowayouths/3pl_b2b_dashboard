@@ -134,7 +134,7 @@ export const PIPELINE_STAGES: { key: PipelineStage; label: string; color: string
   { key: 'inbound', label: '인바운드 접수', color: '#3B82F6' },
   { key: 'doc_review', label: '서류 검토', color: '#F59E0B' },
   { key: 'contracting', label: '계약 진행', color: '#8B5CF6' },
-  { key: 'operating', label: '운영중', color: '#10B981' },
+  { key: 'operating', label: '운영 시작', color: '#10B981' },
 ];
 
 export const STATUS_LABELS: Record<PartnerStatus, string> = {

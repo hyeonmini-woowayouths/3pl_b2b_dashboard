@@ -39,9 +39,9 @@ export function KanbanFilters({ filters, onChange }: KanbanFiltersProps) {
       {/* 기간 프리셋 */}
       <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-0.5">
         {[
-          { label: '7일', days: 7 },
-          { label: '30일', days: 30 },
-          { label: '90일', days: 90 },
+          { label: '최근 7일', days: 7 },
+          { label: '최근 30일', days: 30 },
+          { label: '최근 90일', days: 90 },
           { label: '전체', days: 0 },
         ].map((p) => {
           const isActive = p.days === 0
