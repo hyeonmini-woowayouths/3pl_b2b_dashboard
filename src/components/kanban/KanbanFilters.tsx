@@ -42,15 +42,13 @@ export function KanbanFilters({ filters, onChange }: KanbanFiltersProps) {
           { label: '최근 7일', days: 7 },
           { label: '최근 30일', days: 30 },
           { label: '최근 90일', days: 90 },
-          { label: '전체', days: 0 },
+          { label: '최근 1년', days: 365 },
         ].map((p) => {
-          const isActive = p.days === 0
-            ? !filters.dateFrom
-            : filters.dateFrom === daysAgo(p.days)
+          const isActive = filters.dateFrom === daysAgo(p.days)
           return (
             <button
               key={p.label}
-              onClick={() => onChange({ ...filters, dateFrom: p.days ? daysAgo(p.days) : '', dateTo: '' })}
+              onClick={() => onChange({ ...filters, dateFrom: daysAgo(p.days), dateTo: '' })}
               className={`px-2.5 py-1.5 text-xs rounded-md transition-colors ${
                 isActive ? 'bg-white text-blue-700 font-semibold shadow-sm' : 'text-gray-500 hover:text-gray-700'
               }`}

@@ -14,6 +14,7 @@ export function DashboardPage() {
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS)
   const [selectedPartnerId, setSelectedPartnerId] = useState<string | null>(null)
   const [showNewPartner, setShowNewPartner] = useState(false)
+  const [sortBy, setSortBy] = useState('date_desc')
 
   const { kanban, loading, error, reload } = usePartners({
     search: searchQuery || undefined,
@@ -21,6 +22,7 @@ export function DashboardPage() {
     dateTo: filters.dateTo || undefined,
     contractType: filters.contractType,
     statuses: filters.statuses.length > 0 ? filters.statuses : undefined,
+    sortBy,
   })
 
   const handlePartnerClick = (partner: Partner) => {
@@ -58,7 +60,9 @@ export function DashboardPage() {
             <KanbanBoard
               kanban={kanban}
               onPartnerClick={handlePartnerClick}
-              hasDateFilter={!!filters.dateFrom || !!filters.dateTo}
+              hasDateFilter
+              sortBy={sortBy}
+              onSortChange={setSortBy}
             />
           )}
         </div>

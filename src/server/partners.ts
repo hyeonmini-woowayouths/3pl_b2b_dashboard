@@ -67,6 +67,7 @@ app.get('/kanban', (c) => {
   const contractType = c.req.query('contract_type')
   const statuses = c.req.query('statuses') // comma-separated
   const perColumn = Number(c.req.query('per_column')) || 50
+  const sortBy = c.req.query('sort_by') // 'date_asc' | 'date_desc' | 'name_asc' | 'name_desc'
 
   let searchWhere = ''
   const searchParams: unknown[] = []
@@ -117,6 +118,14 @@ app.get('/kanban', (c) => {
       WHERE p.deleted_at IS NULL AND p.pipeline_stage = ? ${searchWhere} ${dateWhere}
     `).get(stage, ...allParams) as { c: number }).c
 
+    // 정렬: 단계별 기준 날짜 또는 상호명
+    const dateCol = stageDateColumn[stage] ?? 'p.apply_date'
+    let orderBy = `${dateCol} DESC` // 기본: 최신순
+    if (sortBy === 'date_asc') orderBy = `${dateCol} ASC`
+    else if (sortBy === 'date_desc') orderBy = `${dateCol} DESC`
+    else if (sortBy === 'name_asc') orderBy = `p.company_name ASC`
+    else if (sortBy === 'name_desc') orderBy = `p.company_name DESC`
+
     const partners = db.prepare(`
       SELECT
         p.id, p.contract_type, p.pipeline_stage, p.status,
@@ -133,7 +142,7 @@ app.get('/kanban', (c) => {
       LEFT JOIN zones z ON z.id = p.confirmed_zone_id
       LEFT JOIN users u ON u.id = p.assigned_user_id
       WHERE p.deleted_at IS NULL AND p.pipeline_stage = ? ${searchWhere} ${dateWhere}
-      ORDER BY p.updated_at DESC
+      ORDER BY ${orderBy}
       LIMIT ?
     `).all(stage, ...allParams, perColumn)
 

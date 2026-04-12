@@ -131,6 +131,13 @@ export function PartnerDetailModal({ partnerId, onClose, onUpdate }: Props) {
 
   useEffect(() => { reload() }, [reload])
 
+  // Esc 키로 모달 닫기
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', handleKey)
+    return () => window.removeEventListener('keydown', handleKey)
+  }, [onClose])
+
   const handleFieldSave = async (field: string, value: string) => {
     await updatePartner(partnerId, { [field]: value || null })
     await reload()

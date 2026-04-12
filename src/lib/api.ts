@@ -37,6 +37,7 @@ export interface KanbanFilters {
   dateTo?: string
   contractType?: string
   statuses?: string[]
+  sortBy?: string
 }
 
 export function fetchKanban(filters?: KanbanFilters): Promise<KanbanData> {
@@ -46,6 +47,7 @@ export function fetchKanban(filters?: KanbanFilters): Promise<KanbanData> {
   if (filters?.dateTo) params.set('date_to', filters.dateTo)
   if (filters?.contractType && filters.contractType !== 'all') params.set('contract_type', filters.contractType)
   if (filters?.statuses?.length) params.set('statuses', filters.statuses.join(','))
+  if (filters?.sortBy) params.set('sort_by', filters.sortBy)
   const qs = params.toString()
   return request(`/partners/kanban${qs ? `?${qs}` : ''}`)
 }

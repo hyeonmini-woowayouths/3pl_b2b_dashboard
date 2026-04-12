@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { Sidebar } from '../components/layout/Sidebar'
 import { PartnerDetailModal } from '../components/partner/PartnerDetailModal'
 import { Search, ChevronLeft, ChevronRight, ArrowUpDown, Download, Filter } from 'lucide-react'
@@ -31,7 +32,8 @@ export function PartnersListPage() {
   const [data, setData] = useState<ListResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
-  const [stageFilter, setStageFilter] = useState<string>('')
+  const [searchParams] = useSearchParams()
+  const [stageFilter, setStageFilter] = useState<string>(searchParams.get('stage') ?? '')
   const [contractTypeFilter, setContractTypeFilter] = useState<string>('')
   const [page, setPage] = useState(0)
   const [selectedPartnerId, setSelectedPartnerId] = useState<string | null>(null)

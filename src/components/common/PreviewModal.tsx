@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { X, Eye } from 'lucide-react'
 
 interface PreviewModalProps {
@@ -11,6 +12,12 @@ interface PreviewModalProps {
 }
 
 export function PreviewModal({ title, subtitle, onClose, onSend, sendLabel = '발송', sending, children }: PreviewModalProps) {
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', h)
+    return () => window.removeEventListener('keydown', h)
+  }, [onClose])
+
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center" onClick={onClose}>
       <div className="absolute inset-0 bg-black/50" />

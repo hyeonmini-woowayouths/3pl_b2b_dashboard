@@ -1,5 +1,5 @@
 import { X } from 'lucide-react'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 interface ConfirmModalProps {
   title: string
@@ -20,6 +20,12 @@ export function ConfirmModal({
 }: ConfirmModalProps) {
   const [reason, setReason] = useState('')
   const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => { if (e.key === 'Escape') onCancel() }
+    window.addEventListener('keydown', h)
+    return () => window.removeEventListener('keydown', h)
+  }, [onCancel])
 
   const handleConfirm = async () => {
     setLoading(true)
