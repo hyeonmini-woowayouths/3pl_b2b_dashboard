@@ -66,7 +66,7 @@ app.get('/kanban', (c) => {
   const dateTo = c.req.query('date_to')
   const contractType = c.req.query('contract_type')
   const statuses = c.req.query('statuses') // comma-separated
-  const perColumn = Number(c.req.query('per_column')) || 50
+  const perColumn = Number(c.req.query('per_column')) || 1000
   const sortBy = c.req.query('sort_by') // 'date_asc' | 'date_desc' | 'name_asc' | 'name_desc'
 
   let searchWhere = ''

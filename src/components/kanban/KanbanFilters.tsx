@@ -41,8 +41,6 @@ export function KanbanFilters({ filters, onChange }: KanbanFiltersProps) {
         {[
           { label: '최근 7일', days: 7 },
           { label: '최근 30일', days: 30 },
-          { label: '최근 90일', days: 90 },
-          { label: '최근 1년', days: 365 },
         ].map((p) => {
           const isActive = filters.dateFrom === daysAgo(p.days)
           return (
