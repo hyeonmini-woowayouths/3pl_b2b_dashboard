@@ -58,6 +58,7 @@ export function DashboardPage() {
             <KanbanBoard
               kanban={kanban}
               onPartnerClick={handlePartnerClick}
+              hasDateFilter={!!filters.dateFrom || !!filters.dateTo}
             />
           )}
         </div>

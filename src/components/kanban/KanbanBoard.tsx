@@ -5,9 +5,10 @@ import type { Partner } from '../../types/partner'
 interface KanbanBoardProps {
   kanban: Record<string, { count: number; partners: Partner[] }>
   onPartnerClick: (partner: Partner) => void
+  hasDateFilter?: boolean
 }
 
-export function KanbanBoard({ kanban, onPartnerClick }: KanbanBoardProps) {
+export function KanbanBoard({ kanban, onPartnerClick, hasDateFilter }: KanbanBoardProps) {
   return (
     <div className="flex gap-4 h-full min-h-0">
       {PIPELINE_STAGES.map((stage) => {
@@ -19,6 +20,7 @@ export function KanbanBoard({ kanban, onPartnerClick }: KanbanBoardProps) {
             partners={stageData?.partners ?? []}
             count={stageData?.count ?? 0}
             onPartnerClick={onPartnerClick}
+            hasDateFilter={hasDateFilter}
           />
         )
       })}
