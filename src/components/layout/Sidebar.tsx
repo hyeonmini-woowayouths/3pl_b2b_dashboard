@@ -58,9 +58,11 @@ export function Sidebar() {
       </nav>
 
       <div className="border-t border-gray-100 py-3 px-3 space-y-0.5">
-        <a href="#" className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-50">
-          <Settings size={18} /> 시스템 설정
-        </a>
+        <Link to="/templates" className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors ${
+          location.pathname === '/templates' ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-gray-600 hover:bg-gray-50'
+        }`}>
+          <Settings size={18} /> 템플릿 관리
+        </Link>
         <a href="#" className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-50">
           <HelpCircle size={18} /> 정책 위키
         </a>
