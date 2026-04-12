@@ -37,7 +37,7 @@ export function PartnersListPage() {
   const [selectedPartnerId, setSelectedPartnerId] = useState<string | null>(null)
   const [sortField, setSortField] = useState<string>('apply_date')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
-  const limit = 50
+  const [limit, setLimit] = useState(50)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -190,11 +190,22 @@ export function PartnersListPage() {
         </div>
 
         {/* 페이지네이션 */}
-        {totalPages > 1 && (
+        {data && data.total > 0 && (
           <div className="px-6 py-3 bg-white border-t border-gray-200 flex items-center justify-between shrink-0">
-            <span className="text-xs text-gray-500">
-              {page * limit + 1}~{Math.min((page + 1) * limit, data?.total ?? 0)} / {data?.total.toLocaleString()}건
-            </span>
+            <div className="flex items-center gap-3">
+              <span className="text-xs text-gray-500">
+                {page * limit + 1}~{Math.min((page + 1) * limit, data?.total ?? 0)} / {data?.total.toLocaleString()}건
+              </span>
+              <select
+                value={limit}
+                onChange={(e) => { setLimit(Number(e.target.value)); setPage(0) }}
+                className="text-xs px-2 py-1 border border-gray-200 rounded bg-white"
+              >
+                <option value={50}>50건</option>
+                <option value={100}>100건</option>
+                <option value={200}>200건</option>
+              </select>
+            </div>
             <div className="flex items-center gap-1">
               <button
                 onClick={() => setPage(p => Math.max(0, p - 1))}
