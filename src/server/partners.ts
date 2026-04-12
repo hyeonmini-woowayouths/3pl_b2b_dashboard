@@ -75,14 +75,9 @@ app.get('/kanban', (c) => {
     const q = `%${search}%`
     searchParams.push(q, q, q)
   }
-  if (dateFrom) {
-    searchWhere += ' AND p.apply_date >= ?'
-    searchParams.push(dateFrom)
-  }
-  if (dateTo) {
-    searchWhere += ' AND p.apply_date <= ?'
-    searchParams.push(dateTo)
-  }
+  // 날짜 필터는 단계별로 의미 있는 날짜 컬럼 적용
+  // inbound: apply_date, doc_review: updated_at, contracting: updated_at, operating: operating_start_date
+  const dateFilterSql = dateFrom || dateTo ? true : false
   if (contractType && contractType !== 'all') {
     searchWhere += ' AND p.contract_type = ?'
     searchParams.push(contractType)
@@ -95,14 +90,32 @@ app.get('/kanban', (c) => {
     }
   }
 
+  // 단계별 날짜 필터 컬럼: 각 단계에서 의미 있는 시점 기준
+  const stageDateColumn: Record<string, string> = {
+    inbound: 'p.apply_date',           // 신청일
+    doc_review: 'p.updated_at',        // 서류 검토 진입/갱신일
+    contracting: 'p.updated_at',       // 계약 진행 진입/갱신일
+    operating: "COALESCE(p.operating_start_date, p.updated_at)",  // 운영 시작일
+  }
+
   const stages = ['inbound', 'doc_review', 'contracting', 'operating']
   const result: Record<string, { count: number; partners: unknown[] }> = {}
 
   for (const stage of stages) {
+    let dateWhere = ''
+    const dateParams: unknown[] = []
+    if (dateFilterSql) {
+      const col = stageDateColumn[stage] ?? 'p.apply_date'
+      if (dateFrom) { dateWhere += ` AND ${col} >= ?`; dateParams.push(dateFrom) }
+      if (dateTo) { dateWhere += ` AND ${col} <= ?`; dateParams.push(dateTo) }
+    }
+
+    const allParams = [...searchParams, ...dateParams]
+
     const count = (db.prepare(`
       SELECT COUNT(*) as c FROM partners p
-      WHERE p.deleted_at IS NULL AND p.pipeline_stage = ? ${searchWhere}
-    `).get(stage, ...searchParams) as { c: number }).c
+      WHERE p.deleted_at IS NULL AND p.pipeline_stage = ? ${searchWhere} ${dateWhere}
+    `).get(stage, ...allParams) as { c: number }).c
 
     const partners = db.prepare(`
       SELECT
@@ -112,16 +125,17 @@ app.get('/kanban', (c) => {
         p.desired_region_text, p.confirmed_zone_id,
         z.zone_code AS confirmed_zone_code,
         p.pricing_plan, p.dp_code,
+        p.operating_start_date,
         p.assigned_team,
         u.name AS assigned_user_name,
         p.created_at, p.updated_at
       FROM partners p
       LEFT JOIN zones z ON z.id = p.confirmed_zone_id
       LEFT JOIN users u ON u.id = p.assigned_user_id
-      WHERE p.deleted_at IS NULL AND p.pipeline_stage = ? ${searchWhere}
+      WHERE p.deleted_at IS NULL AND p.pipeline_stage = ? ${searchWhere} ${dateWhere}
       ORDER BY p.updated_at DESC
       LIMIT ?
-    `).all(stage, ...searchParams, perColumn)
+    `).all(stage, ...allParams, perColumn)
 
     result[stage] = { count, partners }
   }
