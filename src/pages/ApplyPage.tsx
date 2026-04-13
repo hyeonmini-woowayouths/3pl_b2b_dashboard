@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Layers, CheckCircle, AlertTriangle } from 'lucide-react'
 
-const API_BASE = 'http://localhost:3001/api'
+const API_BASE = '/api'
 
 const BUSINESS_TYPES = ['일반과세', '법인', '간이과세', '면세']
 const EXPERIENCE_OPTIONS = ['없음', '6개월 미만', '6개월~1년', '1년 이상']

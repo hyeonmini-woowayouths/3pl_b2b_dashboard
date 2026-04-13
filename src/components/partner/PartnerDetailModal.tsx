@@ -587,7 +587,7 @@ export function PartnerDetailModal({ partnerId, onClose, onUpdate }: Props) {
               {/* BRMS Export */}
               {partner.pipeline_stage === 'operating' && (
                 <button
-                  onClick={() => window.open('http://localhost:3001/api/partners/export/brms-partner', '_blank')}
+                  onClick={() => window.open('/api/partners/export/brms-partner', '_blank')}
                   className="text-sm px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
                 >
                   BRMS Export

@@ -10,7 +10,7 @@ interface TopHeaderProps {
 function ExportDropdown() {
   const [open, setOpen] = useState(false)
   const downloadCsv = (type: 'brms-business' | 'brms-partner') => {
-    window.open(`http://localhost:3001/api/partners/export/${type}`, '_blank')
+    window.open(`/api/partners/export/${type}`, '_blank')
     setOpen(false)
   }
   return (

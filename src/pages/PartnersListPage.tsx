@@ -6,7 +6,7 @@ import { Search, ChevronLeft, ChevronRight, ArrowUpDown, Download, Filter } from
 import { STATUS_LABELS } from '../types/partner'
 import type { Partner, PipelineStage } from '../types/partner'
 
-const API_BASE = 'http://localhost:3001/api'
+const API_BASE = '/api'
 
 const STAGE_LABELS: Record<string, string> = {
   inbound: '인바운드', doc_review: '서류 검토', contracting: '계약 진행',
@@ -55,7 +55,7 @@ export function PartnersListPage() {
     const json = await res.json() as ListResponse
     setData(json)
     setLoading(false)
-  }, [search, stageFilter, contractTypeFilter, page])
+  }, [search, stageFilter, contractTypeFilter, page, limit])
 
   useEffect(() => {
     const timer = setTimeout(load, 300)

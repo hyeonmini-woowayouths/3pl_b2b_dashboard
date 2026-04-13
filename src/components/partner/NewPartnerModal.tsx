@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { X } from 'lucide-react'
 
-const API_BASE = 'http://localhost:3001/api'
+const API_BASE = '/api'
 
 interface Props {
   onClose: () => void
