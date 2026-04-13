@@ -93,6 +93,12 @@ export interface Partner {
   assigned_user_name: string | null;
   created_at: string;
   updated_at: string;
+
+  // 유선 상담 기록 (P0-3)
+  consultation_date?: string | null;
+  consultation_duration?: number | null;
+  consultation_result?: string | null;
+  consultation_memo?: string | null;
 }
 
 export interface PartnerDocument {

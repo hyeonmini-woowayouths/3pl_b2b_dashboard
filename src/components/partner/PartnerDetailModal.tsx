@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { X, Save, ExternalLink, CheckCircle, Clock, AlertTriangle, Send, History, MessageSquare, MapPin, FileText, FolderOpen, Eye } from 'lucide-react'
-import { fetchPartnerDetail, updatePartner, updateDocument, addNote, movePartnerStage, fetchZones, triggerProposal, triggerDocRemind, triggerContractSend, triggerDriveFolder, ApiError } from '../../lib/api'
+import { fetchPartnerDetail, updatePartner, updateDocument, addNote, movePartnerStage, fetchZones, suggestZones, checkDuplicate, triggerProposal, triggerDocRemind, triggerContractSend, triggerDriveFolder, ApiError } from '../../lib/api'
+import type { ZoneSuggestion } from '../../lib/api'
 import { STATUS_LABELS, PIPELINE_STAGES } from '../../types/partner'
 import type { Partner, PartnerDocument, Contract, Zone, DocType, DocStatus } from '../../types/partner'
 import { ConfirmModal } from '../common/ConfirmModal'
@@ -121,6 +122,8 @@ export function PartnerDetailModal({ partnerId, onClose, onUpdate }: Props) {
   const [actionResult, setActionResult] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
   const [stageConfirm, setStageConfirm] = useState<string | null>(null)
   const [previewType, setPreviewType] = useState<'proposal' | 'alimtalk' | 'signok' | null>(null)
+  const [duplicateInfo, setDuplicateInfo] = useState<{ type: string; message?: string; records: Array<{ id: string; company_name: string; pipeline_stage: string; status: string }> } | null>(null)
+  const [recommendedZones, setRecommendedZones] = useState<ZoneSuggestion[]>([])
 
   const reload = useCallback(async () => {
     setLoading(true)
@@ -130,6 +133,28 @@ export function PartnerDetailModal({ partnerId, onClose, onUpdate }: Props) {
   }, [partnerId])
 
   useEffect(() => { reload() }, [reload])
+
+  // 파트너 로드 완료 후: 재신청 체크 + 권역 자동 추천
+  useEffect(() => {
+    if (!data?.partner) return
+    const p = data.partner
+    // 재신청 체크 (사업자번호가 있고 현재 inbound 단계일 때만)
+    if (p.business_number && p.pipeline_stage === 'inbound') {
+      checkDuplicate(p.business_number).then((r) => {
+        if (r.type !== 'new' && r.records.length > 1) {
+          setDuplicateInfo({ type: r.type, message: r.message, records: r.records.filter(x => x.id !== p.id) })
+        } else {
+          setDuplicateInfo(null)
+        }
+      }).catch(() => setDuplicateInfo(null))
+    }
+    // 권역 자동 추천 (확정 권역 없고 희망지역 있을 때)
+    if (!p.confirmed_zone_id && p.desired_region_text) {
+      suggestZones(p.desired_region_text).then(r => setRecommendedZones(r.suggestions)).catch(() => setRecommendedZones([]))
+    } else {
+      setRecommendedZones([])
+    }
+  }, [data?.partner])
 
   // Esc 키로 모달 닫기
   useEffect(() => {
@@ -246,6 +271,34 @@ export function PartnerDetailModal({ partnerId, onClose, onUpdate }: Props) {
           <button onClick={onClose} className="p-1.5 hover:bg-gray-200 rounded-lg"><X size={18} className="text-gray-500" /></button>
         </div>
 
+        {/* 재신청/중복 경고 배너 */}
+        {duplicateInfo && (
+          <div className={`px-6 py-3 border-b text-sm flex items-start gap-2 ${
+            duplicateInfo.type === 'active_contract' ? 'bg-red-50 border-red-200 text-red-800'
+              : duplicateInfo.type === 'in_progress' ? 'bg-amber-50 border-amber-200 text-amber-800'
+              : 'bg-sky-50 border-sky-200 text-sky-800'
+          }`}>
+            <AlertTriangle size={14} className="shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <div className="font-semibold">
+                {duplicateInfo.type === 'active_contract' && '이미 계약 운영 중'}
+                {duplicateInfo.type === 'in_progress' && '온보딩 진행 중 (중복 접수 가능성)'}
+                {duplicateInfo.type === 'reapplication' && '재신청 (이전 계약 종료)'}
+              </div>
+              <div className="text-xs mt-0.5">{duplicateInfo.message}</div>
+              {duplicateInfo.records.length > 0 && (
+                <div className="text-xs mt-1 space-x-2">
+                  {duplicateInfo.records.slice(0, 3).map((r) => (
+                    <span key={r.id} className="inline-block bg-white/60 px-2 py-0.5 rounded">
+                      {r.company_name} · {r.pipeline_stage}/{r.status}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Tabs */}
         <div className="flex border-b border-gray-100 px-6 shrink-0">
           {[
@@ -326,6 +379,39 @@ export function PartnerDetailModal({ partnerId, onClose, onUpdate }: Props) {
                   </button>
                 </div>
 
+                {/* P0-2: 자동 추천 권역 */}
+                {!partner.confirmed_zone_id && recommendedZones.length > 0 && !showZoneSearch && (
+                  <div className="mb-3 p-3 bg-emerald-50/50 rounded-lg border border-emerald-200">
+                    <div className="text-xs font-bold text-emerald-700 mb-2 flex items-center gap-1">
+                      <MapPin size={12} /> "{partner.desired_region_text}" 기반 추천 권역
+                    </div>
+                    <div className="space-y-1">
+                      {recommendedZones.slice(0, 5).map((z) => (
+                        <button
+                          key={z.id}
+                          onClick={async () => {
+                            await updatePartner(partnerId, { confirmed_zone_id: z.id, pricing_plan: z.pricing_plan })
+                            await reload()
+                            onUpdate()
+                          }}
+                          className="w-full text-left px-3 py-1.5 text-xs hover:bg-emerald-100 rounded flex items-center justify-between bg-white"
+                        >
+                          <span>
+                            <strong className="text-emerald-800">{z.zone_code}</strong>
+                            <span className="text-gray-500 ml-2">({z.rgn1} {z.rgn2} · {z.region_class})</span>
+                          </span>
+                          <span className="flex items-center gap-1.5">
+                            {z.set_cap_warning && (
+                              <span className="text-[10px] text-red-500 font-bold">⚠ Set Cap</span>
+                            )}
+                            <span className="text-emerald-600 font-medium">{z.pricing_plan}</span>
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {showZoneSearch && (
                   <div className="mb-4 p-3 bg-emerald-50 rounded-lg border border-emerald-200">
                     <input
@@ -371,6 +457,45 @@ export function PartnerDetailModal({ partnerId, onClose, onUpdate }: Props) {
                     </>
                   )}
                 </dl>
+              </section>
+
+              <hr className="border-gray-100" />
+
+              {/* 유선 상담 기록 (P0-3) */}
+              <section>
+                <h3 className="text-sm font-bold text-indigo-600 mb-3">
+                  📞 유선 상담 기록 <span className="text-xs text-gray-400 font-normal">(최종 권역 확정용 · 건당 약 20분)</span>
+                </h3>
+                <dl className="grid grid-cols-4 gap-x-6 gap-y-3">
+                  <EditableField
+                    label="상담일"
+                    value={partner.consultation_date ?? null}
+                    onSave={(v) => handleFieldSave('consultation_date', v)}
+                    type="date"
+                  />
+                  <EditableField
+                    label="소요시간(분)"
+                    value={partner.consultation_duration != null ? String(partner.consultation_duration) : null}
+                    onSave={(v) => handleFieldSave('consultation_duration', v)}
+                    type="number"
+                  />
+                  <EditableField
+                    label="상담 결과"
+                    value={partner.consultation_result ?? null}
+                    onSave={(v) => handleFieldSave('consultation_result', v)}
+                  />
+                  <InfoField
+                    label="담당자"
+                    value={partner.assigned_user_name}
+                  />
+                </dl>
+                <div className="mt-3">
+                  <EditableField
+                    label="상담 메모"
+                    value={partner.consultation_memo ?? null}
+                    onSave={(v) => handleFieldSave('consultation_memo', v)}
+                  />
+                </div>
               </section>
 
               <hr className="border-gray-100" />

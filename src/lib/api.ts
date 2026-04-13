@@ -141,3 +141,27 @@ export function fetchZones(search?: string, openOnly?: boolean) {
   const qs = params.toString()
   return request<{ data: import('../types/partner').Zone[]; total: number }>(`/zones${qs ? `?${qs}` : ''}`)
 }
+
+export interface ZoneSuggestion {
+  id: string
+  zone_code: string
+  rgn1: string
+  rgn2: string
+  region_class: string
+  pricing_plan: string | null
+  set_tracker_available: boolean
+  set_cap_warning: boolean
+}
+
+export function suggestZones(desiredRegionText: string) {
+  const qs = new URLSearchParams({ q: desiredRegionText }).toString()
+  return request<{ suggestions: ZoneSuggestion[] }>(`/zones/suggest?${qs}`)
+}
+
+export function checkDuplicate(businessNumber: string) {
+  return request<{
+    type: 'new' | 'active_contract' | 'reapplication' | 'in_progress'
+    message?: string
+    records: Array<{ id: string; company_name: string; pipeline_stage: string; status: string; dp_code: string | null; apply_date: string | null; operating_start_date: string | null }>
+  }>(`/partners/check-duplicate/${businessNumber}`)
+}

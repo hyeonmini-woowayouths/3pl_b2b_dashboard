@@ -118,6 +118,12 @@ CREATE TABLE IF NOT EXISTS partners (
   lms_sent TEXT,
   contract_progress TEXT,
 
+  -- 유선 상담 기록 (P0-3)
+  consultation_date TEXT,
+  consultation_duration INTEGER, -- minutes
+  consultation_result TEXT,
+  consultation_memo TEXT,
+
   -- 메타
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now')),

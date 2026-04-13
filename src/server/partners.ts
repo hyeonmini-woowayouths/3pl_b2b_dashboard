@@ -315,6 +315,7 @@ app.patch('/:id', async (c) => {
     'status', 'pipeline_stage',
     'assigned_team', 'assigned_user_id',
     'drop_reason', 'doc_review_result', 'proposal_sent',
+    'consultation_date', 'consultation_duration', 'consultation_result', 'consultation_memo',
   ]
 
   const sets: string[] = []
@@ -335,6 +336,50 @@ app.patch('/:id', async (c) => {
   db.prepare(`UPDATE partners SET ${sets.join(', ')} WHERE id = ?`).run(...vals)
 
   return c.json({ ok: true })
+})
+
+// ── GET /api/partners/check-duplicate/:bizNum — P0-1: 재신청 판정 ──
+app.get('/check-duplicate/:bizNum', (c) => {
+  const db = getDb()
+  const bizNum = c.req.param('bizNum')
+
+  const existing = db.prepare(`
+    SELECT id, company_name, pipeline_stage, status, dp_code, apply_date, operating_start_date
+    FROM partners
+    WHERE business_number = ? AND deleted_at IS NULL
+    ORDER BY updated_at DESC
+  `).all(bizNum) as Array<Record<string, string | null>>
+
+  if (existing.length === 0) {
+    return c.json({ type: 'new', records: [] })
+  }
+
+  // 현재 운영 중인 건
+  const operating = existing.find(r => r.pipeline_stage === 'operating')
+  if (operating) {
+    return c.json({
+      type: 'active_contract',
+      message: '이미 계약 운영 중인 사업자입니다. 협력사 계정만 추가로 생성이 필요할 수 있습니다.',
+      records: existing,
+    })
+  }
+
+  // 종료된 건만 있음 (재신청)
+  const terminated = existing.filter(r => r.pipeline_stage === 'terminated')
+  if (terminated.length === existing.length) {
+    return c.json({
+      type: 'reapplication',
+      message: '이전 계약이 종료된 사업자의 재신청입니다.',
+      records: existing,
+    })
+  }
+
+  // 진행 중인 건 (inbound/doc_review/contracting)
+  return c.json({
+    type: 'in_progress',
+    message: '현재 온보딩 진행 중인 사업자입니다. 중복 접수일 수 있습니다.',
+    records: existing,
+  })
 })
 
 // ── POST /api/partners/apply — F-16: 외부 셀프서비스 접수 ──
@@ -365,7 +410,7 @@ app.post('/apply', async (c) => {
     return c.json({ error: '간이과세자는 신청할 수 없습니다. 일반과세 사업자 또는 법인사업자만 가능합니다.' }, 400)
   }
 
-  // 중복 사업자번호 체크
+  // 진행 중인 온보딩/운영 중 사업자는 차단 (재신청은 허용)
   const existing = db.prepare(
     "SELECT id, pipeline_stage, status FROM partners WHERE business_number = ? AND deleted_at IS NULL AND pipeline_stage != 'terminated'"
   ).get(body.business_number) as { id: string; pipeline_stage: string; status: string } | undefined
@@ -373,6 +418,12 @@ app.post('/apply', async (c) => {
   if (existing) {
     return c.json({ error: `이미 등록된 사업자입니다 (현재 상태: ${existing.pipeline_stage}/${existing.status})` }, 409)
   }
+
+  // 종료된 이전 이력 확인 (재신청 표시)
+  const terminated = db.prepare(
+    "SELECT COUNT(*) as c FROM partners WHERE business_number = ? AND deleted_at IS NULL AND pipeline_stage = 'terminated'"
+  ).get(body.business_number) as { c: number }
+  const isReapplication = terminated.c > 0
 
   const now = new Date().toISOString()
   const id = `p_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
