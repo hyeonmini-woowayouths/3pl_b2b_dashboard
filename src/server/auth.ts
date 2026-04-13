@@ -26,7 +26,7 @@ const DEV_MODE = process.env.AUTH_MODE !== 'production'
 export async function authMiddleware(c: Context, next: Next) {
   // 공개 엔드포인트는 인증 생략
   const path = c.req.path
-  if (path === '/api/health' || path.startsWith('/api/partners/apply')) {
+  if (path === '/api/health' || path.startsWith('/api/partners/apply') || path.startsWith('/api/portal')) {
     return next()
   }
 

@@ -237,7 +237,120 @@ CREATE TABLE IF NOT EXISTS partner_notes (
 );
 
 -- ============================================================
--- 11. activity_logs (감사 로그)
+-- 11-1. partner_sessions (사장님 포털 세션)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS partner_sessions (
+  token_hash TEXT PRIMARY KEY,
+  partner_id TEXT NOT NULL REFERENCES partners(id),
+  business_number TEXT NOT NULL,
+  phone TEXT,
+  ip_address TEXT,
+  user_agent TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  expires_at TEXT NOT NULL,
+  last_activity TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_partner_sessions_partner ON partner_sessions(partner_id);
+CREATE INDEX IF NOT EXISTS idx_partner_sessions_expires ON partner_sessions(expires_at);
+
+-- ============================================================
+-- 11-2. partner_otps (OTP 인증)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS partner_otps (
+  id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+  partner_id TEXT NOT NULL REFERENCES partners(id),
+  business_number TEXT NOT NULL,
+  phone TEXT NOT NULL,
+  code_hash TEXT NOT NULL,
+  attempts INTEGER NOT NULL DEFAULT 0,
+  verified INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  expires_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_partner_otps_biz ON partner_otps(business_number, created_at DESC);
+
+-- ============================================================
+-- 11-3. proposal_codes (제안서 보안코드)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS proposal_codes (
+  id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+  partner_id TEXT NOT NULL REFERENCES partners(id),
+  code_hash TEXT NOT NULL,
+  view_count INTEGER NOT NULL DEFAULT 0,
+  max_views INTEGER NOT NULL DEFAULT 10,
+  expires_at TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_proposal_codes_partner ON proposal_codes(partner_id);
+
+-- ============================================================
+-- 11-4. portal_actions (포털 감사 로그)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS portal_actions (
+  id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+  partner_id TEXT NOT NULL REFERENCES partners(id),
+  action TEXT NOT NULL,
+  details TEXT,
+  ip_address TEXT,
+  user_agent TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_portal_actions_partner ON portal_actions(partner_id, created_at DESC);
+
+-- ============================================================
+-- 11-5. zone_change_requests (권역 선택 승인 대기, 운영중 권역 변경)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS zone_change_requests (
+  id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+  partner_id TEXT NOT NULL REFERENCES partners(id),
+  request_type TEXT NOT NULL CHECK(request_type IN ('initial', 'change')), -- initial=최초권역선택, change=운영중변경
+  from_zone_id TEXT REFERENCES zones(id),
+  to_zone_id TEXT NOT NULL REFERENCES zones(id),
+  reason TEXT,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','approved','rejected')),
+  decided_by TEXT REFERENCES users(id),
+  decided_at TEXT,
+  decision_reason TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_zone_requests_partner ON zone_change_requests(partner_id);
+CREATE INDEX IF NOT EXISTS idx_zone_requests_status ON zone_change_requests(status);
+
+-- ============================================================
+-- 11-6. set_change_requests (세트 변경 신청)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS set_change_requests (
+  id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+  partner_id TEXT NOT NULL REFERENCES partners(id),
+  current_sets INTEGER,
+  requested_sets INTEGER NOT NULL,
+  effective_week TEXT,
+  reason TEXT,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','approved','rejected')),
+  decided_by TEXT REFERENCES users(id),
+  decided_at TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- ============================================================
+-- 11-7. info_change_requests (정보 변경 신청 — 계좌/연락처)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS info_change_requests (
+  id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+  partner_id TEXT NOT NULL REFERENCES partners(id),
+  field_type TEXT NOT NULL CHECK(field_type IN ('bank_account','phone','email','representative_name')),
+  old_value TEXT,
+  new_value TEXT NOT NULL,
+  reason TEXT,
+  attachment_url TEXT,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','approved','rejected')),
+  decided_by TEXT REFERENCES users(id),
+  decided_at TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- ============================================================
+-- 12. activity_logs (감사 로그)
 -- ============================================================
 CREATE TABLE IF NOT EXISTS activity_logs (
   id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),

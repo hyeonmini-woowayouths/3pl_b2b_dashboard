@@ -7,6 +7,7 @@ import { initDb } from './db'
 import partners from './partners'
 import zones from './zones'
 import integrations from './integrations'
+import portal from './portal'
 import { integrationConfig } from './integrations/config'
 import { authMiddleware } from './auth'
 
@@ -21,6 +22,7 @@ app.use('/api/*', authMiddleware)
 app.route('/api/partners', partners)
 app.route('/api/zones', zones)
 app.route('/api/integrations', integrations)
+app.route('/api/portal', portal)
 
 // Health check
 app.get('/api/health', (c) => c.json({
