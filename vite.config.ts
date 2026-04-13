@@ -12,6 +12,7 @@ export default defineConfig({
   },
   server: {
     host: true, // 외부 네트워크 접근 허용
+    allowedHosts: true, // 모든 호스트 허용 (cloudflared 터널 등)
     proxy: {
       '/api': {
         target: 'http://localhost:3001',
