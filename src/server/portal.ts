@@ -12,7 +12,7 @@ import { getCookie, setCookie, deleteCookie } from 'hono/cookie'
 import crypto from 'crypto'
 import { getDb } from './db'
 import { sendProposal } from './integrations/n8n'
-import { verifyBusinessNumber } from './integrations/nts'
+import { verifyBusinessNumber, validateBusinessIdentity } from './integrations/nts'
 
 const app = new Hono()
 
@@ -33,13 +33,31 @@ function logAction(partnerId: string, action: string, details: Record<string, un
   `).run(partnerId, action, details ? JSON.stringify(details) : null, ip, ua)
 }
 
-// ── POST /verify-biznum — 국세청 사업자번호 조회 (공개) ──
+// ── POST /verify-biznum — 국세청 사업자번호 조회 + 진위확인 (공개) ──
 app.post('/verify-biznum', async (c) => {
-  const { business_number } = await c.req.json<{ business_number: string }>()
+  const { business_number, representative_name, start_date, company_name } = await c.req.json<{
+    business_number: string
+    representative_name?: string
+    start_date?: string
+    company_name?: string
+  }>()
   if (!business_number) return c.json({ error: '사업자번호를 입력해주세요' }, 400)
 
-  const result = await verifyBusinessNumber(business_number)
-  return c.json(result)
+  // 1. 상태 조회 (사업자 형태 판별)
+  const status = await verifyBusinessNumber(business_number)
+
+  // 2. 진위확인 (대표자명 필수 — 이름/사업자번호 일치 체크)
+  let identity: Awaited<ReturnType<typeof validateBusinessIdentity>> | null = null
+  if (representative_name) {
+    identity = await validateBusinessIdentity({
+      businessNumber: business_number,
+      representativeName: representative_name,
+      startDate: start_date,
+      companyName: company_name,
+    })
+  }
+
+  return c.json({ ...status, identity })
 })
 
 // ── POST /lookup — 사업자번호+전화번호 조회 ──
@@ -290,19 +308,32 @@ app.post('/apply', async (c) => {
   const db = getDb()
   const body = await c.req.json<{
     applicant_name: string; phone: string; business_number: string;
-    company_name: string; email?: string; desired_region_text?: string;
+    representative_name?: string;
+    company_name: string; email?: string;
+    desired_zone_1_id?: string; desired_zone_2_id?: string;
     experience_years?: string; rider_count?: string; platform_experience?: string; comment?: string;
   }>()
 
   const bizClean = body.business_number.replace(/-/g, '')
 
-  // 서버 측 국세청 재검증 (클라이언트 우회 방지)
+  // 서버 측 국세청 상태 재검증
   const verify = await verifyBusinessNumber(bizClean)
   if (!verify.success || !verify.isActive) {
     return c.json({ error: verify.error ?? '사업자등록 상태를 확인할 수 없습니다' }, 400)
   }
   if (verify.formal === '간이과세') {
     return c.json({ error: '간이과세자는 협력사 가입이 불가능합니다' }, 400)
+  }
+
+  // 서버 측 진위확인 (대표자명 필수)
+  const repName = body.representative_name ?? body.applicant_name
+  const identity = await validateBusinessIdentity({
+    businessNumber: bizClean,
+    representativeName: repName,
+    companyName: body.company_name,
+  })
+  if (!identity.valid) {
+    return c.json({ error: identity.message }, 400)
   }
 
   // 서버가 확정한 business_type 사용 (클라이언트 값 무시)
@@ -320,19 +351,28 @@ app.post('/apply', async (c) => {
   const now = new Date().toISOString()
   const id = `p_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
 
+  // 희망지역 텍스트: 1지망 + 2지망 권역 코드로 구성
+  let desiredText: string | null = null
+  if (body.desired_zone_1_id) {
+    const z1 = db.prepare('SELECT zone_code FROM zones WHERE id = ?').get(body.desired_zone_1_id) as { zone_code: string } | undefined
+    const z2 = body.desired_zone_2_id ? db.prepare('SELECT zone_code FROM zones WHERE id = ?').get(body.desired_zone_2_id) as { zone_code: string } | undefined : undefined
+    desiredText = [z1?.zone_code, z2?.zone_code].filter(Boolean).join(', ')
+  }
+
   db.prepare(`
     INSERT INTO partners (
       id, contract_type, pipeline_stage, status,
-      apply_date, company_name, applicant_name, email,
+      apply_date, company_name, applicant_name, representative_name, email,
       phone, representative_phone,
       business_type, business_number,
-      desired_region_text, experience_years, rider_count,
-      platform_experience, comment,
+      desired_region_text, desired_zone_1_id, desired_zone_2_id,
+      experience_years, rider_count, platform_experience, comment,
       created_at, updated_at
-    ) VALUES (?, 'direct', 'inbound', 'submitted', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(id, now.slice(0,10), body.company_name, body.applicant_name, body.email ?? null,
+    ) VALUES (?, 'direct', 'inbound', 'submitted', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(id, now.slice(0,10), body.company_name, body.applicant_name, repName, body.email ?? null,
     body.phone.replace(/-/g, ''), body.phone.replace(/-/g, ''),
-    businessType, bizClean, body.desired_region_text ?? null,
+    businessType, bizClean, desiredText,
+    body.desired_zone_1_id ?? null, body.desired_zone_2_id ?? null,
     body.experience_years ?? null, body.rider_count ?? null,
     body.platform_experience ?? null, body.comment ?? null, now, now)
 

@@ -34,11 +34,15 @@ export interface NtsVerifyResult {
   formal: '일반과세' | '법인' | '간이과세' | '면세' | '기타'
   source: 'nts_api' | 'pattern_fallback'
   error?: string
+  identity?: { valid: boolean; message: string; source: 'nts_api' | 'skipped' } | null
 }
 
 export const portalApi = {
-  verifyBizNum: (business_number: string) =>
-    req<NtsVerifyResult>('/verify-biznum', { method: 'POST', body: JSON.stringify({ business_number }) }),
+  verifyBizNum: (business_number: string, representative_name?: string, company_name?: string) =>
+    req<NtsVerifyResult>('/verify-biznum', { method: 'POST', body: JSON.stringify({ business_number, representative_name, company_name }) }),
+
+  searchZones: (q: string) =>
+    fetch(`/api/zones/suggest?q=${encodeURIComponent(q)}`, { credentials: 'include' }).then(r => r.json()) as Promise<{ suggestions: Array<{ id: string; zone_code: string; rgn1: string; rgn2: string; region_class: string; pricing_plan: string | null; set_tracker_available: boolean }> }>,
 
   lookup: (business_number: string, phone: string) =>
     req<LookupResult>('/lookup', { method: 'POST', body: JSON.stringify({ business_number, phone }) }),

@@ -1,7 +1,6 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { DashboardPage } from './pages/DashboardPage'
 import { PartnersListPage } from './pages/PartnersListPage'
-import { ApplyPage } from './pages/ApplyPage'
 import { StatsPage } from './pages/StatsPage'
 import { TemplatesPage } from './pages/TemplatesPage'
 import { PortalHome } from './pages/portal/PortalHome'
@@ -15,7 +14,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<DashboardPage />} />
         <Route path="/partners" element={<PartnersListPage />} />
-        <Route path="/apply" element={<ApplyPage />} />
+        <Route path="/apply" element={<PortalApply />} />
         <Route path="/stats" element={<StatsPage />} />
         <Route path="/templates" element={<TemplatesPage />} />
 

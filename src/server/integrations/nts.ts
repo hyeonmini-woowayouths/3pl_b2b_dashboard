@@ -56,7 +56,10 @@ function classifyFormal(taxTypeCd: string, isCorp: boolean): BusinessFormal {
  * 국세청 API 호출 (실제)
  */
 async function callNtsApi(bizNum: string, apiKey: string): Promise<NtsResult> {
-  const url = `https://api.odcloud.kr/api/nts-businessman/v1/status?serviceKey=${encodeURIComponent(apiKey)}`
+  // 이중 인코딩 방지: 이미 인코딩된 키면 그대로, 원본 키면 한번 인코딩
+  // data.go.kr에서 발급되는 키는 보통 %2B, %2F, %3D가 포함된 인코딩 상태
+  const decoded = decodeURIComponent(apiKey)
+  const url = `https://api.odcloud.kr/api/nts-businessman/v1/status?serviceKey=${encodeURIComponent(decoded)}`
   const clean = bizNum.replace(/-/g, '')
 
   try {
@@ -130,6 +133,88 @@ function fallbackByPattern(bizNum: string, note?: string): NtsResult {
     formal: isCorp ? '법인' : '일반과세',
     source: 'pattern_fallback',
     error: note,
+  }
+}
+
+/**
+ * 국세청 진위확인 API — 사업자번호 + 대표자명 + (선택)개업일 매칭
+ * Endpoint: POST /api/nts-businessman/v1/validate
+ */
+export interface ValidateIdentityResult {
+  valid: boolean
+  message: string
+  source: 'nts_api' | 'skipped'
+}
+
+export async function validateBusinessIdentity(params: {
+  businessNumber: string
+  representativeName: string
+  startDate?: string  // YYYYMMDD (국세청 API 필수)
+  companyName?: string
+}): Promise<ValidateIdentityResult> {
+  const apiKey = process.env.NTS_API_KEY
+  if (!apiKey) {
+    return { valid: true, message: 'API 키 미설정 — 진위확인 스킵', source: 'skipped' }
+  }
+
+  // start_dt는 국세청 진위확인의 필수 파라미터. 없으면 스킵
+  if (!params.startDate) {
+    return {
+      valid: true,
+      message: '개업일 미제공 — 진위확인 스킵 (서류 검토 단계에서 확인 예정)',
+      source: 'skipped',
+    }
+  }
+
+  const clean = params.businessNumber.replace(/-/g, '')
+  if (clean.length !== 10) return { valid: false, message: '사업자번호는 10자리여야 합니다', source: 'skipped' }
+
+  const decoded = decodeURIComponent(apiKey)
+  const url = `https://api.odcloud.kr/api/nts-businessman/v1/validate?serviceKey=${encodeURIComponent(decoded)}`
+
+  try {
+    const payload: Record<string, unknown> = {
+      b_no: clean,
+      start_dt: params.startDate,
+      p_nm: params.representativeName,
+    }
+    if (params.companyName) payload.b_nm = params.companyName
+
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ businesses: [payload] }),
+    })
+
+    if (!res.ok) {
+      const text = await res.text().catch(() => '')
+      return { valid: false, message: `API 오류 ${res.status}: ${text.slice(0, 100)}`, source: 'nts_api' }
+    }
+
+    const json = await res.json() as {
+      status_code: string
+      data: Array<{
+        b_no: string
+        valid: string  // '01' = 일치, '02' = 불일치
+        valid_msg: string
+        request_param: Record<string, string>
+        status?: { b_no: string; b_stt_cd: string }
+      }>
+    }
+
+    const item = json.data?.[0]
+    if (!item) return { valid: false, message: '응답이 비어있습니다', source: 'nts_api' }
+
+    const isValid = item.valid === '01'
+    return {
+      valid: isValid,
+      message: isValid
+        ? '사업자번호와 대표자명이 일치합니다'
+        : `국세청 진위확인 불일치: ${item.valid_msg ?? '사업자번호와 대표자명이 일치하지 않습니다'}`,
+      source: 'nts_api',
+    }
+  } catch (e) {
+    return { valid: false, message: `API 호출 실패: ${e instanceof Error ? e.message : 'unknown'}`, source: 'nts_api' }
   }
 }
 

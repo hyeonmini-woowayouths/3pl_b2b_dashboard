@@ -4,6 +4,7 @@ import { ArrowRight, Shield, AlertCircle, CheckCircle } from 'lucide-react'
 import { PortalLayout } from './PortalLayout'
 import { portalApi } from '../../lib/portal-api'
 import type { LookupResult } from '../../lib/portal-api'
+import { formatBizNum, formatPhone } from '../../lib/format'
 
 type Step = 'lookup' | 'otp' | 'new'
 
@@ -93,7 +94,7 @@ export function PortalHome() {
                 type="text"
                 inputMode="numeric"
                 value={bizNum}
-                onChange={(e) => setBizNum(e.target.value)}
+                onChange={(e) => setBizNum(formatBizNum(e.target.value))}
                 required
                 placeholder="000-00-00000"
                 className="w-full px-4 py-3 text-base border border-gray-200 rounded-xl bg-gray-50 focus:ring-2 focus:ring-emerald-500 focus:outline-none focus:bg-white"
@@ -105,7 +106,7 @@ export function PortalHome() {
                 type="tel"
                 inputMode="numeric"
                 value={phone}
-                onChange={(e) => setPhone(e.target.value)}
+                onChange={(e) => setPhone(formatPhone(e.target.value))}
                 required
                 placeholder="010-0000-0000"
                 className="w-full px-4 py-3 text-base border border-gray-200 rounded-xl bg-gray-50 focus:ring-2 focus:ring-emerald-500 focus:outline-none focus:bg-white"
