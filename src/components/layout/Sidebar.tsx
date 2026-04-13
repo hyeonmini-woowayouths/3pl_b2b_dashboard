@@ -1,4 +1,4 @@
-import { Users, Settings, HelpCircle, Layers } from 'lucide-react'
+import { Users, Settings, HelpCircle, Layers, UserCog, ExternalLink } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
 
 const NAV_ITEMS = [
@@ -51,6 +51,27 @@ export function Sidebar() {
           )
         })}
       </nav>
+
+      {/* 협력사 포털 안내 (데모) */}
+      <div className="px-3 py-3 border-t border-gray-100">
+        <div className="px-3 py-3 rounded-xl bg-gradient-to-br from-emerald-50 to-emerald-100/50 border border-emerald-200">
+          <div className="flex items-center gap-1.5 mb-1.5">
+            <UserCog size={14} className="text-emerald-700" />
+            <span className="text-[11px] font-bold text-emerald-800 uppercase tracking-wide">협력사 포털 (데모)</span>
+          </div>
+          <p className="text-[11px] text-emerald-700 leading-relaxed mb-2.5">
+            사장님이 접속하는 셀프서비스 포털을 체험해보세요.
+          </p>
+          <a
+            href="/portal"
+            target="_blank"
+            rel="noreferrer"
+            className="flex items-center justify-center gap-1 w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg transition-colors"
+          >
+            포털 열기 <ExternalLink size={11} />
+          </a>
+        </div>
+      </div>
 
       <div className="border-t border-gray-100 py-3 px-3 space-y-0.5">
         <Link to="/templates" className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors ${
