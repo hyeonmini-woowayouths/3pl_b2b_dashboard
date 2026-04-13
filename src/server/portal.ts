@@ -12,6 +12,7 @@ import { getCookie, setCookie, deleteCookie } from 'hono/cookie'
 import crypto from 'crypto'
 import { getDb } from './db'
 import { sendProposal } from './integrations/n8n'
+import { verifyBusinessNumber } from './integrations/nts'
 
 const app = new Hono()
 
@@ -31,6 +32,15 @@ function logAction(partnerId: string, action: string, details: Record<string, un
     VALUES (?, ?, ?, ?, ?)
   `).run(partnerId, action, details ? JSON.stringify(details) : null, ip, ua)
 }
+
+// ── POST /verify-biznum — 국세청 사업자번호 조회 (공개) ──
+app.post('/verify-biznum', async (c) => {
+  const { business_number } = await c.req.json<{ business_number: string }>()
+  if (!business_number) return c.json({ error: '사업자번호를 입력해주세요' }, 400)
+
+  const result = await verifyBusinessNumber(business_number)
+  return c.json(result)
+})
 
 // ── POST /lookup — 사업자번호+전화번호 조회 ──
 app.post('/lookup', async (c) => {
@@ -279,16 +289,24 @@ app.post('/logout', requirePortalAuth, (c) => {
 app.post('/apply', async (c) => {
   const db = getDb()
   const body = await c.req.json<{
-    applicant_name: string; phone: string; business_number: string; business_type: string;
+    applicant_name: string; phone: string; business_number: string;
     company_name: string; email?: string; desired_region_text?: string;
     experience_years?: string; rider_count?: string; platform_experience?: string; comment?: string;
   }>()
 
-  if (body.business_type === '간이과세') {
+  const bizClean = body.business_number.replace(/-/g, '')
+
+  // 서버 측 국세청 재검증 (클라이언트 우회 방지)
+  const verify = await verifyBusinessNumber(bizClean)
+  if (!verify.success || !verify.isActive) {
+    return c.json({ error: verify.error ?? '사업자등록 상태를 확인할 수 없습니다' }, 400)
+  }
+  if (verify.formal === '간이과세') {
     return c.json({ error: '간이과세자는 협력사 가입이 불가능합니다' }, 400)
   }
 
-  const bizClean = body.business_number.replace(/-/g, '')
+  // 서버가 확정한 business_type 사용 (클라이언트 값 무시)
+  const businessType = verify.formal
 
   // 진행중/운영중 차단
   const blocker = db.prepare(`
@@ -314,7 +332,7 @@ app.post('/apply', async (c) => {
     ) VALUES (?, 'direct', 'inbound', 'submitted', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(id, now.slice(0,10), body.company_name, body.applicant_name, body.email ?? null,
     body.phone.replace(/-/g, ''), body.phone.replace(/-/g, ''),
-    body.business_type, bizClean, body.desired_region_text ?? null,
+    businessType, bizClean, body.desired_region_text ?? null,
     body.experience_years ?? null, body.rider_count ?? null,
     body.platform_experience ?? null, body.comment ?? null, now, now)
 

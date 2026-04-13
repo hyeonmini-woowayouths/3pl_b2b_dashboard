@@ -1,15 +1,9 @@
 import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { AlertCircle, CheckCircle } from 'lucide-react'
+import { AlertCircle, CheckCircle, Shield, Loader2 } from 'lucide-react'
 import { PortalLayout } from './PortalLayout'
 import { portalApi } from '../../lib/portal-api'
-
-const BIZ_TYPES = [
-  { value: '일반과세', label: '일반과세 사업자', allowed: true },
-  { value: '법인', label: '법인사업자', allowed: true },
-  { value: '간이과세', label: '간이과세 사업자', allowed: false, note: '가입 불가' },
-  { value: '면세', label: '면세사업자', allowed: true },
-]
+import type { NtsVerifyResult } from '../../lib/portal-api'
 
 export function PortalApply() {
   const nav = useNavigate()
@@ -21,7 +15,6 @@ export function PortalApply() {
     applicant_name: '',
     phone: prefilledPhone,
     business_number: prefilledBiz,
-    business_type: '',
     company_name: '',
     email: '',
     desired_region_text: '',
@@ -33,12 +26,42 @@ export function PortalApply() {
   const [result, setResult] = useState<{ ok: boolean; partnerId?: string } | null>(null)
   const [loading, setLoading] = useState(false)
 
+  // 국세청 검증 상태
+  const [verifying, setVerifying] = useState(false)
+  const [verification, setVerification] = useState<NtsVerifyResult | null>(null)
+  const [lastVerifiedBiz, setLastVerifiedBiz] = useState('')
+
   const set = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }))
-  const isSimIgwa = form.business_type === '간이과세'
+
+  const handleVerify = async () => {
+    const biz = form.business_number.trim()
+    if (!biz) return
+    setError(null)
+    setVerifying(true)
+    setVerification(null)
+    try {
+      const r = await portalApi.verifyBizNum(biz)
+      setVerification(r)
+      setLastVerifiedBiz(biz)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '검증 실패')
+    } finally {
+      setVerifying(false)
+    }
+  }
+
+  // 사업자번호가 변경되면 검증 초기화
+  const handleBizChange = (v: string) => {
+    set('business_number', v)
+    if (v.trim() !== lastVerifiedBiz) setVerification(null)
+  }
+
+  const canSubmit = verification?.success && verification.isActive && verification.formal !== '간이과세' && verification.formal !== '기타' && form.business_number.trim() === lastVerifiedBiz
+  const blocked = verification?.formal === '간이과세'
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (isSimIgwa) return
+    if (!canSubmit) return
     setError(null)
     setLoading(true)
     try {
@@ -100,34 +123,69 @@ export function PortalApply() {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-gray-600 mb-1.5">사업자등록번호 <span className="text-red-500">*</span></label>
-            <input type="text" value={form.business_number} onChange={(e) => set('business_number', e.target.value)} required placeholder="000-00-00000"
-              className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-gray-50 focus:ring-2 focus:ring-emerald-500 focus:outline-none focus:bg-white" />
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-gray-600 mb-1.5">사업자 형태 <span className="text-red-500">*</span></label>
-            <div className="grid grid-cols-2 gap-2">
-              {BIZ_TYPES.map(t => (
-                <button
-                  key={t.value}
-                  type="button"
-                  onClick={() => set('business_type', t.value)}
-                  className={`px-3 py-2.5 text-sm rounded-lg border transition-colors ${
-                    form.business_type === t.value
-                      ? t.allowed ? 'bg-emerald-50 border-emerald-400 text-emerald-700 font-semibold' : 'bg-red-50 border-red-400 text-red-700 font-semibold'
-                      : 'bg-white border-gray-200 text-gray-700 hover:border-gray-300'
-                  }`}
-                >
-                  {t.label}
-                  {t.note && <span className="block text-[10px] mt-0.5">{t.note}</span>}
-                </button>
-              ))}
+            <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+              사업자등록번호 <span className="text-red-500">*</span>
+              <span className="ml-1 text-[10px] font-normal text-gray-400">국세청 조회로 사업자 형태가 자동 판별됩니다</span>
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={form.business_number}
+                onChange={(e) => handleBizChange(e.target.value)}
+                required
+                placeholder="000-00-00000"
+                className="flex-1 px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-gray-50 focus:ring-2 focus:ring-emerald-500 focus:outline-none focus:bg-white"
+              />
+              <button
+                type="button"
+                onClick={handleVerify}
+                disabled={verifying || !form.business_number.trim()}
+                className="px-4 py-2.5 text-sm font-semibold bg-gray-900 text-white rounded-lg hover:bg-gray-800 disabled:opacity-40 flex items-center gap-1.5"
+              >
+                {verifying ? <Loader2 size={14} className="animate-spin" /> : <Shield size={14} />}
+                {verifying ? '조회 중' : '조회'}
+              </button>
             </div>
-            {isSimIgwa && (
-              <div className="mt-2 px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700">
-                간이과세자는 협력사 가입이 불가능합니다. 일반과세 또는 법인사업자로 전환 후 신청해주세요.
+
+            {/* 검증 결과 */}
+            {verification && (
+              <div className={`mt-2 rounded-lg border p-3 ${
+                !verification.success || !verification.isActive || verification.formal === '기타' ? 'bg-red-50 border-red-200'
+                  : verification.formal === '간이과세' ? 'bg-red-50 border-red-300'
+                  : 'bg-emerald-50 border-emerald-200'
+              }`}>
+                {verification.success && verification.isActive && verification.formal !== '간이과세' && verification.formal !== '기타' ? (
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-700">
+                      <CheckCircle size={14} /> 사업자 등록 확인 완료
+                    </div>
+                    <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[11px] text-emerald-800">
+                      <div>사업자 형태: <strong>{verification.formal}</strong></div>
+                      <div>사업자 상태: <strong>{verification.isActive ? '계속사업자' : '휴/폐업'}</strong></div>
+                      {verification.taxType && <div className="col-span-2">과세유형: {verification.taxType}</div>}
+                      <div className="col-span-2 text-[10px] text-emerald-600">
+                        출처: {verification.source === 'nts_api' ? '국세청 API' : '로컬 패턴 추정 (API 키 미설정)'}
+                      </div>
+                    </div>
+                  </div>
+                ) : verification.formal === '간이과세' ? (
+                  <div className="flex items-start gap-1.5 text-xs text-red-700">
+                    <AlertCircle size={14} className="shrink-0 mt-0.5" />
+                    <div>
+                      <div className="font-bold">간이과세자는 협력사 가입 불가</div>
+                      <div className="text-[11px] mt-0.5">일반과세 또는 법인사업자로 전환 후 신청해주세요.</div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-start gap-1.5 text-xs text-red-700">
+                    <AlertCircle size={14} className="shrink-0 mt-0.5" />
+                    <span>{verification.error ?? '유효하지 않은 사업자번호입니다'}</span>
+                  </div>
+                )}
               </div>
+            )}
+            {!verification && !verifying && form.business_number && (
+              <p className="mt-1.5 text-[11px] text-gray-500">사업자번호 입력 후 <strong>조회</strong> 버튼을 눌러주세요.</p>
             )}
           </div>
 
@@ -182,8 +240,13 @@ export function PortalApply() {
             </span>
           </label>
 
-          <button type="submit" disabled={loading || !terms || isSimIgwa || !form.business_type}
-            className="w-full py-3 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 disabled:opacity-50 transition-colors">
+          {!canSubmit && !blocked && (
+            <p className="text-[11px] text-amber-600 text-center">
+              사업자번호 조회가 완료되어야 제출할 수 있습니다
+            </p>
+          )}
+          <button type="submit" disabled={loading || !terms || !canSubmit}
+            className="w-full py-3 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
             {loading ? '접수 중...' : '신청서 제출'}
           </button>
 

@@ -24,7 +24,22 @@ export interface LookupResult {
   history?: number
 }
 
+export interface NtsVerifyResult {
+  success: boolean
+  businessNumber: string
+  isActive: boolean
+  isCorporation: boolean
+  taxType: string | null
+  taxTypeCd: string | null
+  formal: '일반과세' | '법인' | '간이과세' | '면세' | '기타'
+  source: 'nts_api' | 'pattern_fallback'
+  error?: string
+}
+
 export const portalApi = {
+  verifyBizNum: (business_number: string) =>
+    req<NtsVerifyResult>('/verify-biznum', { method: 'POST', body: JSON.stringify({ business_number }) }),
+
   lookup: (business_number: string, phone: string) =>
     req<LookupResult>('/lookup', { method: 'POST', body: JSON.stringify({ business_number, phone }) }),
 
