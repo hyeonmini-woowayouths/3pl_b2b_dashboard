@@ -1,20 +1,11 @@
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { AlertCircle, CheckCircle, Shield, Loader2, Search, MapPin, X } from 'lucide-react'
+import { AlertCircle, CheckCircle, Shield, Loader2, Info } from 'lucide-react'
 import { PortalLayout } from './PortalLayout'
 import { portalApi } from '../../lib/portal-api'
-import type { NtsVerifyResult } from '../../lib/portal-api'
+import type { NtsVerifyResult, EnrichedZone } from '../../lib/portal-api'
 import { formatBizNum, formatPhone } from '../../lib/format'
-
-interface ZoneSuggestion {
-  id: string
-  zone_code: string
-  rgn1: string
-  rgn2: string
-  region_class: string
-  pricing_plan: string | null
-  set_tracker_available: boolean
-}
+import { ZoneSelector } from '../../components/portal/ZoneSelector'
 
 export function PortalApply() {
   const nav = useNavigate()
@@ -31,8 +22,8 @@ export function PortalApply() {
     experience_years: '',
     rider_count: '',
   })
-  const [zone1, setZone1] = useState<ZoneSuggestion | null>(null)
-  const [zone2, setZone2] = useState<ZoneSuggestion | null>(null)
+  const [zone1, setZone1] = useState<EnrichedZone | null>(null)
+  const [zone2, setZone2] = useState<EnrichedZone | null>(null)
   const [terms, setTerms] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<{ ok: boolean; partnerId?: string } | null>(null)
@@ -239,8 +230,12 @@ export function PortalApply() {
           {/* ③ 희망 권역 */}
           <section className="space-y-3">
             <SectionHeader title="희망 배달 권역" hint="1지망은 필수, 2지망은 선택" required />
-            <ZonePicker label="1지망 (필수)" value={zone1} onChange={setZone1} required />
-            <ZonePicker label="2지망 (선택)" value={zone2} onChange={setZone2} excludeId={zone1?.id} />
+            <ZoneSelector label="1지망 (필수)" value={zone1} onChange={setZone1} required />
+            <ZoneSelector label="2지망 (선택)" value={zone2} onChange={setZone2} excludeId={zone1?.id} />
+            <p className="text-[11px] text-gray-500 leading-relaxed flex items-start gap-1.5 pt-1">
+              <Info size={11} className="shrink-0 mt-0.5 text-gray-400" />
+              <span>신청 접수 후에도 담당자 검토·협의를 통해 권역 조정이 가능합니다. 우선 가장 가까운 후보를 선택해주세요.</span>
+            </p>
           </section>
 
           <div className="border-t border-gray-100" />
@@ -342,100 +337,5 @@ function Select({ value, onChange, options }: { value: string; onChange: (v: str
       <option value="">선택</option>
       {options.map((o) => <option key={o} value={o}>{o}</option>)}
     </select>
-  )
-}
-
-// ── 권역 검색 + 선택 컴포넌트 ──────────────
-function ZonePicker({ label, value, onChange, required, excludeId }: {
-  label: string; value: ZoneSuggestion | null; onChange: (z: ZoneSuggestion | null) => void
-  required?: boolean; excludeId?: string
-}) {
-  const [q, setQ] = useState('')
-  const [open, setOpen] = useState(false)
-  const [results, setResults] = useState<ZoneSuggestion[]>([])
-  const [searching, setSearching] = useState(false)
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  useEffect(() => {
-    if (timerRef.current) clearTimeout(timerRef.current)
-    if (!q || q.length < 1) { setResults([]); return }
-    timerRef.current = setTimeout(async () => {
-      setSearching(true)
-      try {
-        const r = await portalApi.searchZones(q)
-        setResults(r.suggestions.filter(s => s.id !== excludeId).slice(0, 10))
-      } finally {
-        setSearching(false)
-      }
-    }, 250)
-    return () => { if (timerRef.current) clearTimeout(timerRef.current) }
-  }, [q, excludeId])
-
-  if (value) {
-    return (
-      <div className="flex items-center justify-between px-3 py-2.5 bg-emerald-50 border border-emerald-300 rounded-lg">
-        <div className="text-sm">
-          <div className="font-bold text-emerald-900">{value.zone_code}</div>
-          <div className="text-[11px] text-emerald-700">
-            {value.rgn1} {value.rgn2} · {value.region_class} · {value.pricing_plan ?? '기본'} 요금제
-            {!value.set_tracker_available && <span className="ml-1 text-red-600 font-bold">⚠ Set Cap</span>}
-          </div>
-        </div>
-        <button type="button" onClick={() => { onChange(null); setQ('') }}
-          className="p-1 hover:bg-emerald-100 rounded">
-          <X size={14} className="text-emerald-700" />
-        </button>
-      </div>
-    )
-  }
-
-  return (
-    <div className="relative">
-      <div className="relative">
-        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-        <input
-          type="text"
-          value={q}
-          onChange={(e) => { setQ(e.target.value); setOpen(true) }}
-          onFocus={() => setOpen(true)}
-          placeholder={`${label} · 예) 강남, 부천, 용인기흥`}
-          required={required && !value}
-          className="w-full pl-9 pr-3 py-2.5 text-sm border border-gray-200 rounded-lg bg-white placeholder:text-gray-400 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 focus:outline-none"
-        />
-      </div>
-      {open && q && (
-        <>
-          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute top-full left-0 right-0 mt-1 z-20 bg-white border border-gray-200 rounded-lg shadow-lg max-h-64 overflow-y-auto">
-            {searching && (
-              <div className="px-3 py-2 text-xs text-gray-400 text-center"><Loader2 size={12} className="inline animate-spin mr-1" /> 검색 중...</div>
-            )}
-            {!searching && results.length === 0 && (
-              <div className="px-3 py-3 text-xs text-gray-400 text-center">검색 결과가 없습니다</div>
-            )}
-            {!searching && results.map(r => (
-              <button
-                key={r.id}
-                type="button"
-                onClick={() => { onChange(r); setOpen(false); setQ('') }}
-                className="w-full text-left px-3 py-2 hover:bg-emerald-50 border-b border-gray-100 last:border-0 flex items-center justify-between"
-              >
-                <div>
-                  <div className="text-sm font-medium text-gray-900 flex items-center gap-1">
-                    <MapPin size={11} className="text-emerald-500" />
-                    {r.zone_code}
-                  </div>
-                  <div className="text-[11px] text-gray-500">{r.rgn1} {r.rgn2} · {r.region_class}</div>
-                </div>
-                <div className="text-[10px] text-gray-500">
-                  {r.pricing_plan}
-                  {!r.set_tracker_available && <div className="text-red-500 font-bold">⚠ Cap</div>}
-                </div>
-              </button>
-            ))}
-          </div>
-        </>
-      )}
-    </div>
   )
 }
